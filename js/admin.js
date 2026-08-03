@@ -2,9 +2,9 @@
  * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, Live Grid Preview, and Upload-Only Shop Logo
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.0';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.0';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.0';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.1';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.1';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.1';
 
 let draftConfig = null;
 let initialConfigSha = null;

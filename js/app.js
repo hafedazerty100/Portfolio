@@ -2,8 +2,8 @@
  * App — Main application bootstrap, multilingual i18n hydration, and theme toggle handler
  */
 
-import { loadConfig, onConfigChange, getContent, getUI, getLanguage, setLanguage, getThemeMode, toggleThemeMode } from './config-loader.js?v=1.1.0';
-import { initAdmin } from './admin.js?v=1.1.0';
+import { loadConfig, onConfigChange, getContent, getUI, getLanguage, setLanguage, getThemeMode, toggleThemeMode } from './config-loader.js?v=1.1.1';
+import { initAdmin } from './admin.js?v=1.1.1';
 
 let activeCategoryFilter = 'ALL';
 
@@ -35,15 +35,30 @@ function renderControls() {
   const currentMode = getThemeMode();
 
   const themeIcon = currentMode === 'dark' ? '☀️' : '🌙';
+  const currentLangLabel = currentLang === 'ar' ? 'العربية' : (currentLang === 'fr' ? 'Français' : 'English');
 
   controlsContainer.innerHTML = `
     <button id="btnThemeToggle" class="btn-theme-toggle" title="Toggle Light/Dark Theme">
       ${themeIcon}
     </button>
-    <div class="lang-switcher">
-      <button class="lang-btn ${currentLang === 'en' ? 'active' : ''}" data-lang="en">EN</button>
-      <button class="lang-btn ${currentLang === 'fr' ? 'active' : ''}" data-lang="fr">FR</button>
-      <button class="lang-btn ${currentLang === 'ar' ? 'active' : ''}" data-lang="ar">عربي</button>
+    <div id="langDropdownWrap" class="lang-dropdown-wrap">
+      <button id="langDropdownToggle" class="lang-dropdown-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>${currentLangLabel}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+
+      <div id="langDropdownMenu" class="lang-dropdown-menu">
+        <button class="lang-dropdown-item ${currentLang === 'en' ? 'active' : ''}" data-lang="en">
+          <span>English</span> <span class="lang-badge">EN</span>
+        </button>
+        <button class="lang-dropdown-item ${currentLang === 'fr' ? 'active' : ''}" data-lang="fr">
+          <span>Français</span> <span class="lang-badge">FR</span>
+        </button>
+        <button class="lang-dropdown-item ${currentLang === 'ar' ? 'active' : ''}" data-lang="ar">
+          <span>العربية</span> <span class="lang-badge">AR</span>
+        </button>
+      </div>
     </div>
   `;
 
@@ -52,11 +67,27 @@ function renderControls() {
     toggleThemeMode();
   });
 
-  // Bind Language Switcher Listeners
-  controlsContainer.querySelectorAll('.lang-btn').forEach(btn => {
+  // Bind Language Dropdown Menu Listeners
+  const wrap = document.getElementById('langDropdownWrap');
+  const toggleBtn = document.getElementById('langDropdownToggle');
+  const menu = document.getElementById('langDropdownMenu');
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.classList.toggle('show');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (wrap && !wrap.contains(e.target)) {
+      menu.classList.remove('show');
+    }
+  });
+
+  menu.querySelectorAll('.lang-dropdown-item').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const targetLang = e.target.getAttribute('data-lang');
+      const targetLang = e.currentTarget.getAttribute('data-lang');
       setLanguage(targetLang);
+      menu.classList.remove('show');
     });
   });
 }
