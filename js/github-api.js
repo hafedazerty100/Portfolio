@@ -16,19 +16,19 @@ export async function getFileMetadata(owner, repo, path = 'data/config.json', br
   const cleanToken = patToken ? patToken.trim() : '';
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
   const headers = {
-    'Accept': 'application/vnd.github.v3+json',
+    'Accept': 'application/vnd.github+json',
     'Cache-Control': 'no-cache'
   };
 
   if (cleanToken) {
-    headers['Authorization'] = `token ${cleanToken}`;
+    headers['Authorization'] = `Bearer ${cleanToken}`;
   }
 
   let response;
   try {
     response = await fetch(url, { headers });
   } catch (err) {
-    console.error('GitHub API connection error:', err);
+    console.error('GitHub API connection error raw object:', err);
     throw new Error(`Connection to GitHub failed: ${err.message}. Please check your internet connection, ensure api.github.com is not blocked by your firewall/VPN/adblocker, and that your browser is not blocking the request.`);
   }
 
@@ -91,14 +91,14 @@ export async function publishConfigToGitHub({ owner, repo, path = 'data/config.j
     response = await fetch(url, {
       method: 'PUT',
       headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `token ${cleanToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${cleanToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(bodyData)
     });
   } catch (err) {
-    console.error('GitHub API publish connection error:', err);
+    console.error('GitHub API publish connection error raw object:', err);
     throw new Error(`Connection to GitHub failed: ${err.message}. Please check your internet connection, ensure api.github.com is not blocked by your firewall/VPN/adblocker, and that your browser is not blocking the request.`);
   }
 
