@@ -2,8 +2,8 @@
  * App — Main application bootstrap, multilingual i18n hydration, and theme toggle handler
  */
 
-import { loadConfig, onConfigChange, getContent, getUI, getLanguage, setLanguage, getThemeMode, toggleThemeMode } from './config-loader.js';
-import { initAdmin } from './admin.js';
+import { loadConfig, onConfigChange, getContent, getUI, getLanguage, setLanguage, getThemeMode, toggleThemeMode } from './config-loader.js?v=1.0.2';
+import { initAdmin } from './admin.js?v=1.0.2';
 
 let activeCategoryFilter = 'ALL';
 

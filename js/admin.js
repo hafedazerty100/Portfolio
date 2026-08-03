@@ -2,9 +2,9 @@
  * Admin — Admin God-Mode system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.2';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.2';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.2';
 
 let draftConfig = null;
 let initialConfigSha = null;
