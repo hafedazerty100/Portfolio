@@ -2,9 +2,9 @@
  * Admin — Admin system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.3';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.3';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.3';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.4';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.4';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.4';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -582,6 +582,15 @@ function bindEvents() {
   document.getElementById('btnPublishCommit').addEventListener('click', handlePublish);
   document.getElementById('btnDiscardEdits').addEventListener('click', handleDiscard);
   document.getElementById('btnReloadStaleConfig').addEventListener('click', handleReloadStaleConfig);
+}
+
+function openLoginModal() {
+  const loginModal = document.getElementById('loginModal');
+  if (loginModal) {
+    loginModal.classList.add('active');
+    const passInput = document.getElementById('loginPassword');
+    if (passInput) passInput.focus();
+  }
 }
 
 function openAdminPanel() {
