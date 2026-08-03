@@ -13,20 +13,28 @@ export class StaleCommitConflictError extends Error {
  * Fetches current metadata (including current blob SHA) of data/config.json from GitHub
  */
 export async function getFileMetadata(owner, repo, path = 'data/config.json', branch = 'main', patToken) {
+  const cleanToken = patToken ? patToken.trim() : '';
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
   const headers = {
     'Accept': 'application/vnd.github.v3+json',
     'Cache-Control': 'no-cache'
   };
 
-  if (patToken) {
-    headers['Authorization'] = `Bearer ${patToken}`;
+  if (cleanToken) {
+    headers['Authorization'] = `token ${cleanToken}`;
   }
 
-  const response = await fetch(url, { headers });
+  let response;
+  try {
+    response = await fetch(url, { headers });
+  } catch (err) {
+    console.error('GitHub API connection error:', err);
+    throw new Error(`Connection to GitHub failed: ${err.message}. Please check your internet connection, ensure api.github.com is not blocked by your firewall/VPN/adblocker, and that your browser is not blocking the request.`);
+  }
+
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error(`Repository file '${path}' not found at ${owner}/${repo} (Branch: ${branch}). Check repo settings & PAT permissions.`);
+      throw new Error(`Repository file '${path}' not found at ${owner}/${repo} (Branch: ${branch}). Check repository settings & PAT permissions.`);
     }
     if (response.status === 401) {
       throw new Error(`Unauthorized (401): Personal Access Token is invalid or expired.`);
@@ -51,7 +59,8 @@ function utf8ToBase64(str) {
  * Commits updated config JSON file to GitHub repository via Contents API
  */
 export async function publishConfigToGitHub({ owner, repo, path = 'data/config.json', branch = 'main', patToken, configData, currentSha }) {
-  if (!patToken) {
+  const cleanToken = patToken ? patToken.trim() : '';
+  if (!cleanToken) {
     throw new Error('Personal Access Token (PAT) is required to publish changes.');
   }
   if (!owner || !repo) {
@@ -62,7 +71,7 @@ export async function publishConfigToGitHub({ owner, repo, path = 'data/config.j
 
   // If SHA was not provided, fetch current metadata first
   if (!shaToUse) {
-    const meta = await getFileMetadata(owner, repo, path, branch, patToken);
+    const meta = await getFileMetadata(owner, repo, path, branch, cleanToken);
     shaToUse = meta.sha;
   }
 
@@ -77,15 +86,21 @@ export async function publishConfigToGitHub({ owner, repo, path = 'data/config.j
     branch: branch
   };
 
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      'Accept': 'application/vnd.github.v3+json',
-      'Authorization': `Bearer ${patToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(bodyData)
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': `token ${cleanToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyData)
+    });
+  } catch (err) {
+    console.error('GitHub API publish connection error:', err);
+    throw new Error(`Connection to GitHub failed: ${err.message}. Please check your internet connection, ensure api.github.com is not blocked by your firewall/VPN/adblocker, and that your browser is not blocking the request.`);
+  }
 
   if (response.status === 409) {
     throw new StaleCommitConflictError(

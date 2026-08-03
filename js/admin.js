@@ -2,9 +2,9 @@
  * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, Live Grid Preview, and Upload-Only Shop Logo
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.1';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.1';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.1';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.2';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.2';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.2';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -641,14 +641,32 @@ function openAdminPanel() {
   // Security
   const a = draftConfig.admin || {};
   document.getElementById('adminUsername').value = a.username || 'admin';
-  document.getElementById('repoOwner').value = a.repoOwner || 'hafedazerty100';
-  document.getElementById('repoName').value = a.repoName || 'Portfolio';
-  document.getElementById('repoBranch').value = a.repoBranch || 'main';
+  const owner = a.repoOwner || 'hafedazerty100';
+  const repo = a.repoName || 'Portfolio';
+  const branch = a.repoBranch || 'main';
+
+  document.getElementById('repoOwner').value = owner;
+  document.getElementById('repoName').value = repo;
+  document.getElementById('repoBranch').value = branch;
 
   renderAdminItemsList();
 
   document.getElementById('staleCommitBanner').style.display = 'none';
   document.getElementById('adminPanel').classList.add('active');
+
+  // Pre-fetch remote SHA to prevent stale config updates and speed up first publish
+  const savedToken = getSavedPAT();
+  if (savedToken) {
+    import('./github-api.js?v=1.1.2')
+      .then(m => m.getFileMetadata(owner, repo, 'data/config.json', branch, savedToken))
+      .then(meta => {
+        initialConfigSha = meta.sha;
+        console.log('Successfully pre-fetched remote SHA:', initialConfigSha);
+      })
+      .catch(err => {
+        console.warn('Could not pre-fetch remote config SHA on panel open:', err);
+      });
+  }
 }
 
 function loadShopInfoFormFromDraft() {
@@ -1183,7 +1201,23 @@ async function handlePublish() {
       document.getElementById('staleCommitBanner').style.display = 'block';
       statusEl.innerHTML = `<div class="alert-banner alert-danger"><strong>409 Conflict:</strong> ${err.message}</div>`;
     } else {
-      statusEl.innerHTML = `<div class="alert-banner alert-danger">❌ <strong>Publish Failed:</strong> ${escapeHTML(err.message)}</div>`;
+      const errMsg = err.message || '';
+      if (errMsg.includes('Failed to fetch') || errMsg.includes('Network error') || errMsg.includes('TypeError') || errMsg.includes('Connection to GitHub failed') || errMsg.includes('Failed to execute \'fetch\'')) {
+        statusEl.innerHTML = `
+          <div class="alert-banner alert-danger">
+            <strong>❌ Publish Failed (Connection / Permission Error):</strong>
+            <p style="margin-top: 8px;">The browser's request to GitHub API was blocked or failed to execute. This is typically due to one of the following:</p>
+            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0; line-height: 1.6; text-align: left;">
+              <li><strong>Invalid GitHub PAT Token:</strong> Ensure your token is correct, starts with <code>github_pat_</code> or <code>ghp_</code>, and does not have extra spaces or newlines.</li>
+              <li><strong>Missing PAT scopes/permissions:</strong> The token must have write permission (<strong>Contents: Read & Write</strong> for fine-grained tokens, or the <strong>repo</strong> scope checked for classic tokens) on the target repository: <code>hafedazerty100/Portfolio</code>.</li>
+              <li><strong>Adblockers / VPNs:</strong> Strict adblock rules (Brave Shields, uBlock Origin) or firewall/VPN settings sometimes block connections to the GitHub API (<code>api.github.com</code>). Try temporarily disabling them.</li>
+            </ul>
+            <p style="margin-top: 8px; font-size: 0.8rem; opacity: 0.85;">Details: ${escapeHTML(errMsg)}</p>
+          </div>
+        `;
+      } else {
+        statusEl.innerHTML = `<div class="alert-banner alert-danger">❌ <strong>Publish Failed:</strong> ${escapeHTML(errMsg)}</div>`;
+      }
     }
   }
 }
