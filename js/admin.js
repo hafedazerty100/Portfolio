@@ -1,10 +1,10 @@
 /**
- * Admin — Admin God-Mode system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
+ * Admin — Admin system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.2';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.2';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.2';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.3';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.3';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.3';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -14,6 +14,8 @@ let itemToDeleteId = null;
 let activeShopLang = 'en';
 let activeItemLang = 'en';
 let activeThemeEditingMode = 'dark';
+
+let temporaryItemState = { en: {}, fr: {}, ar: {} };
 
 export function initAdmin() {
   injectAdminDOM();
@@ -53,18 +55,18 @@ function injectAdminDOM() {
               <input type="password" id="loginPAT" class="form-input" placeholder="github_pat_11..." autocomplete="off">
               <p class="form-hint">Stored securely in sessionStorage for this tab session only.</p>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Unlock God-Mode</button>
+            <button type="submit" class="btn btn-primary btn-block">Unlock Admin Panel</button>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Full Admin God-Mode Panel -->
+    <!-- Full Admin Control Panel -->
     <div id="adminPanel" class="admin-panel-overlay">
       <div class="admin-topbar">
         <div class="admin-topbar-title">
           <span>Apex Store Control Center</span>
-          <span class="admin-badge">God-Mode Active</span>
+          <span class="admin-badge">Admin Active</span>
         </div>
         <div class="admin-topbar-actions">
           <button id="quickPublishBtn" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.825rem;">
@@ -349,7 +351,7 @@ function injectAdminDOM() {
       </div>
     </div>
 
-    <!-- Add/Edit Item Modal (Multilingual EN/FR/AR) -->
+    <!-- Add/Edit Item Modal (Upload-Only Images & Multilingual EN/FR/AR) -->
     <div id="itemModal" class="modal-overlay">
       <div class="modal-container" style="max-width: 680px;">
         <div class="modal-header">
@@ -365,16 +367,16 @@ function injectAdminDOM() {
 
           <form id="itemForm">
             <div class="form-group">
-              <label class="form-label">Title (<span id="modalLangLabel">EN</span>)</label>
+              <label class="form-label">Title</label>
               <input type="text" id="itemFormTitle" class="form-input" required>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
               <div class="form-group">
-                <label class="form-label">Category (<span id="modalLangLabelCat">EN</span>)</label>
+                <label class="form-label">Category</label>
                 <input type="text" id="itemFormCategory" class="form-input" required>
               </div>
               <div class="form-group">
-                <label class="form-label">Price (<span id="modalLangLabelPrice">EN</span>)</label>
+                <label class="form-label">Price</label>
                 <input type="text" id="itemFormPrice" class="form-input" required placeholder="e.g. $89.99 or 3000 DZD">
               </div>
             </div>
@@ -386,15 +388,14 @@ function injectAdminDOM() {
               <label class="form-label">Full Description</label>
               <textarea id="itemFormFullDesc" class="form-textarea" required></textarea>
             </div>
+            
+            <!-- Upload-Only Image Field (Canvas scaled to max 800px) -->
             <div class="form-group">
-              <label class="form-label">Image Option (Global across languages)</label>
-              <label class="form-label" style="font-size: 0.8rem;">Option A: Image URL</label>
-              <input type="url" id="itemFormImageUrl" class="form-input" placeholder="https://images.unsplash.com/...">
-              
-              <label class="form-label" style="font-size: 0.8rem; margin-top: 12px;">Option B: Upload File (Auto-resizes & compresses)</label>
+              <label class="form-label">Upload Item Photo</label>
               <input type="file" id="itemFormFileInput" accept="image/*" class="form-input">
-              <div id="imagePreviewBox" style="margin-top: 10px; display: none;">
-                <img id="imagePreviewImg" src="" style="max-height: 120px; border-radius: 8px; border: 1px solid var(--color-card-border);">
+              <p class="form-hint">Images are automatically scaled to max 800px and compressed before saving.</p>
+              <div id="imagePreviewBox" style="margin-top: 12px; display: none;">
+                <img id="imagePreviewImg" src="" style="max-height: 140px; border-radius: 8px; border: 1px solid var(--color-card-border); object-fit: cover;">
               </div>
             </div>
 
@@ -470,7 +471,7 @@ function bindEvents() {
         loginAlert.style.display = 'none';
         loginModal.classList.remove('active');
         openAdminPanel();
-        showToast('God-Mode unlocked successfully!', 'success');
+        showToast('Admin Panel unlocked successfully!', 'success');
       } else {
         loginAlert.textContent = res.error;
         loginAlert.style.display = 'block';
@@ -581,11 +582,6 @@ function bindEvents() {
   document.getElementById('btnPublishCommit').addEventListener('click', handlePublish);
   document.getElementById('btnDiscardEdits').addEventListener('click', handleDiscard);
   document.getElementById('btnReloadStaleConfig').addEventListener('click', handleReloadStaleConfig);
-}
-
-function openLoginModal() {
-  document.getElementById('loginModal').classList.add('active');
-  document.getElementById('loginPassword').focus();
 }
 
 function openAdminPanel() {
@@ -754,7 +750,7 @@ function renderAdminItemsList() {
   items.forEach(item => {
     const row = document.createElement('div');
     row.className = 'admin-item-row';
-    const imgSrc = item.imageUrl || item.imageBase64 || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150';
+    const imgSrc = item.imageBase64 || item.imageUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150';
 
     row.innerHTML = `
       <div class="admin-item-info">
@@ -777,9 +773,6 @@ function renderAdminItemsList() {
   });
 }
 
-// Temporary buffer when editing multi-language item modal
-let temporaryItemState = { en: {}, fr: {}, ar: {} };
-
 function openItemModal(itemId = null) {
   editingItemId = itemId;
   activeItemLang = 'en';
@@ -788,7 +781,6 @@ function openItemModal(itemId = null) {
 
   const modal = document.getElementById('itemModal');
   const titleEl = document.getElementById('itemModalTitle');
-  document.getElementById('imagePreviewBox').style.display = 'none';
   document.getElementById('itemFormFileInput').value = '';
 
   if (itemId) {
@@ -809,7 +801,6 @@ function openItemModal(itemId = null) {
         price: '',
         shortDescription: '',
         fullDescription: '',
-        imageUrl: '',
         imageBase64: '',
         extraFields: { duration: '', instructor: '' }
       };
@@ -827,11 +818,14 @@ function loadItemFormFromTemporary() {
   document.getElementById('itemFormPrice').value = item.price || '';
   document.getElementById('itemFormShortDesc').value = item.shortDescription || '';
   document.getElementById('itemFormFullDesc').value = item.fullDescription || '';
-  document.getElementById('itemFormImageUrl').value = item.imageUrl || temporaryItemState['en'].imageUrl || '';
 
-  if (item.imageBase64 || temporaryItemState['en'].imageBase64) {
-    document.getElementById('imagePreviewImg').src = item.imageBase64 || temporaryItemState['en'].imageBase64;
+  const sharedImg = item.imageBase64 || temporaryItemState['en'].imageBase64 || temporaryItemState['en'].imageUrl || '';
+  if (sharedImg) {
+    document.getElementById('imagePreviewImg').src = sharedImg;
     document.getElementById('imagePreviewBox').style.display = 'block';
+  } else {
+    document.getElementById('imagePreviewImg').src = '';
+    document.getElementById('imagePreviewBox').style.display = 'none';
   }
 
   const container = document.getElementById('extraFieldsContainer');
@@ -841,20 +835,23 @@ function loadItemFormFromTemporary() {
 }
 
 function saveItemFormToTemporary() {
-  const item = temporaryItemState[activeItemLang] || {};
+  if (!temporaryItemState[activeItemLang]) {
+    temporaryItemState[activeItemLang] = {};
+  }
+  const item = temporaryItemState[activeItemLang];
   item.title = document.getElementById('itemFormTitle').value;
   item.category = document.getElementById('itemFormCategory').value;
   item.price = document.getElementById('itemFormPrice').value;
   item.shortDescription = document.getElementById('itemFormShortDesc').value;
   item.fullDescription = document.getElementById('itemFormFullDesc').value;
 
-  const imageUrl = document.getElementById('itemFormImageUrl').value;
   const imageBase64 = document.getElementById('imagePreviewBox').style.display !== 'none' ? document.getElementById('imagePreviewImg').src : '';
 
-  // Apply image across all language versions
+  // Apply uploaded image to all language versions
   ['en', 'fr', 'ar'].forEach(lang => {
-    temporaryItemState[lang].imageUrl = imageUrl;
+    if (!temporaryItemState[lang]) temporaryItemState[lang] = {};
     temporaryItemState[lang].imageBase64 = imageBase64;
+    temporaryItemState[lang].imageUrl = imageBase64;
   });
 
   const extraFields = {};
@@ -914,7 +911,15 @@ function handleImageFileUpload(e) {
       const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
       document.getElementById('imagePreviewImg').src = compressedBase64;
       document.getElementById('imagePreviewBox').style.display = 'block';
-      showToast(`Image auto-compressed to ${Math.round(width)}x${Math.round(height)}px`, 'success');
+
+      // Store immediately to temporary state
+      ['en', 'fr', 'ar'].forEach(lang => {
+        if (!temporaryItemState[lang]) temporaryItemState[lang] = {};
+        temporaryItemState[lang].imageBase64 = compressedBase64;
+        temporaryItemState[lang].imageUrl = compressedBase64;
+      });
+
+      showToast(`Image uploaded & compressed to ${Math.round(width)}x${Math.round(height)}px`, 'success');
     };
     img.src = evt.target.result;
   };
@@ -925,28 +930,45 @@ function handleSaveItem(e) {
   e.preventDefault();
   saveItemFormToTemporary();
 
+  const primary = temporaryItemState['en'] || {};
+
   ['en', 'fr', 'ar'].forEach(lang => {
     draftConfig.i18n[lang] = draftConfig.i18n[lang] || {};
     draftConfig.i18n[lang].items = draftConfig.i18n[lang].items || [];
     const list = draftConfig.i18n[lang].items;
-    const itemData = temporaryItemState[lang];
+    const currentLangItem = temporaryItemState[lang] || {};
+
+    const finalItem = {
+      id: primary.id || `item-${Date.now()}`,
+      title: currentLangItem.title || primary.title || 'Untitled Item',
+      category: currentLangItem.category || primary.category || 'General',
+      price: currentLangItem.price || primary.price || '$0.00',
+      shortDescription: currentLangItem.shortDescription || primary.shortDescription || '',
+      fullDescription: currentLangItem.fullDescription || primary.fullDescription || '',
+      imageBase64: primary.imageBase64 || currentLangItem.imageBase64 || '',
+      imageUrl: primary.imageBase64 || currentLangItem.imageBase64 || '',
+      extraFields: (currentLangItem.extraFields && Object.keys(currentLangItem.extraFields).length > 0)
+        ? currentLangItem.extraFields
+        : (primary.extraFields || {})
+    };
 
     if (editingItemId) {
       const idx = list.findIndex(i => i.id === editingItemId);
       if (idx !== -1) {
-        list[idx] = { ...list[idx], ...itemData };
+        list[idx] = finalItem;
       } else {
-        list.push(itemData);
+        list.push(finalItem);
       }
     } else {
-      list.push(itemData);
+      list.push(finalItem);
     }
   });
 
+  // Set config live and update preview
   setConfig(draftConfig, true);
   renderAdminItemsList();
   document.getElementById('itemModal').classList.remove('active');
-  showToast('Item saved across all languages!', 'success');
+  showToast('Item saved successfully!', 'success');
 }
 
 function promptDeleteItem(itemId, itemTitle) {

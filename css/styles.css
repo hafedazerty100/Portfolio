@@ -557,7 +557,7 @@ body {
 .btn-danger { background: var(--color-danger); color: #ffffff; }
 .btn-block { width: 100%; }
 
-/* ADMIN GOD-MODE FULL PANEL */
+/* ADMIN FULL PANEL */
 .admin-panel-overlay {
   position: fixed;
   inset: 0;

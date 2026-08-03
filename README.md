@@ -1,6 +1,6 @@
 # Apex Online-Store & Portfolio (Zero-Backend Engine)
 
-A responsive, high-performance static website and online catalog system hosted entirely on **GitHub Pages**, featuring a client-side **"God-Mode" Admin Panel**, **Light & Dark Mode themes**, and **Multilingual Support (English, French, Arabic RTL)**.
+A responsive, high-performance static website and online catalog system hosted entirely on **GitHub Pages**, featuring a client-side **Admin Panel**, **Light & Dark Mode themes**, and **Multilingual Support (English, French, Arabic RTL)**.
 
 The site requires **no database, server, or build step**. All site content, theme colors, typography, grid layouts, catalog items, and admin configuration live in `data/config.json`. Admin edits update the live page DOM instantly in real-time, and can be committed directly back to the GitHub repository using the GitHub REST Contents API.
 
@@ -23,7 +23,7 @@ The site requires **no database, server, or build step**. All site content, them
 - **Social & Contact Links**:
   - Supports Instagram, Facebook, WhatsApp, and Twitter (GitHub social link removed).
 
-- **God-Mode Client-Side Admin Panel**:
+- **Client-Side Admin Panel**:
   - **Shop Info Manager**: Edit shop name, tagline, description, logo URL, email, phone, and social links per language.
   - **Theme Customizer**: Independent Light & Dark palette pickers, font selectors, border-radius sliders.
   - **Grid Layout Controls**: Set desktop (1–6), tablet (1–4), and mobile (1–2) column counts and grid gap.
