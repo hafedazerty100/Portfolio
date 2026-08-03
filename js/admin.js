@@ -1,34 +1,32 @@
 /**
- * Admin — Admin God-Mode system interface module
+ * Admin — Admin God-Mode system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
  */
 
-import { getConfig, setConfig, applyTheme, loadConfig } from './config-loader.js';
-import { loginAdmin, isSessionActive, logoutAdmin, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js';
-import { publishConfigToGitHub, StaleCommitConflictError, getFileMetadata } from './github-api.js';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js';
 
 let draftConfig = null;
 let initialConfigSha = null;
 let editingItemId = null;
 let itemToDeleteId = null;
 
-/**
- * Initializes Admin module components into DOM
- */
+let activeShopLang = 'en';
+let activeItemLang = 'en';
+let activeThemeEditingMode = 'dark';
+
 export function initAdmin() {
   injectAdminDOM();
   bindEvents();
 }
 
-/**
- * Injects Modals, Panels, and Admin Triggers into document.body
- */
 function injectAdminDOM() {
   const adminHTML = `
     <!-- Floating Unobtrusive Admin Button -->
     <div class="admin-trigger-wrap">
       <button id="adminTriggerBtn" class="btn-admin-trigger">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V17a1 1 0 0 1-2 0v-.07A7 7 0 0 1 5.07 11H5a1 1 0 0 1 0-2h.07A7 7 0 0 1 11 3.07V3a1 1 0 0 1 2 0v.07A7 7 0 0 1 18.93 9H19a1 1 0 0 1 0 2h-.07A7 7 0 0 1 13 16.93z"/></svg>
-        Admin God-Mode
+        Admin
       </button>
     </div>
 
@@ -51,7 +49,7 @@ function injectAdminDOM() {
               <input type="password" id="loginPassword" class="form-input" required autocomplete="current-password">
             </div>
             <div class="form-group">
-              <label class="form-label" for="loginPAT">GitHub Fine-Grained PAT (Optional for preview, required to Publish)</label>
+              <label class="form-label" for="loginPAT">GitHub Fine-Grained PAT (Required to Publish)</label>
               <input type="password" id="loginPAT" class="form-input" placeholder="github_pat_11..." autocomplete="off">
               <p class="form-hint">Stored securely in sessionStorage for this tab session only.</p>
             </div>
@@ -102,10 +100,16 @@ function injectAdminDOM() {
             </div>
           </div>
 
-          <!-- TAB 1: Shop Info -->
+          <!-- TAB 1: Shop Info (Multilingual EN/FR/AR) -->
           <div id="tab-shop-info" class="admin-tab-pane active">
             <h2 class="pane-title">Shop Information</h2>
-            <p class="pane-subtitle">Edit high-level branding, descriptions, logo, and social media links.</p>
+            <p class="pane-subtitle">Edit branding, descriptions, logo, and social media links across all 3 languages.</p>
+
+            <div class="sub-tab-bar">
+              <button class="sub-tab-btn active" data-shop-lang="en">English (EN)</button>
+              <button class="sub-tab-btn" data-shop-lang="fr">Français (FR)</button>
+              <button class="sub-tab-btn" data-shop-lang="ar">العربية (AR)</button>
+            </div>
 
             <div class="form-group">
               <label class="form-label">Shop Name</label>
@@ -119,21 +123,22 @@ function injectAdminDOM() {
               <label class="form-label">Full Description</label>
               <textarea id="adminShopDesc" class="form-textarea"></textarea>
             </div>
-            <div class="form-group">
-              <label class="form-label">Logo Image URL</label>
-              <input type="url" id="adminShopLogo" class="form-input" placeholder="https://...">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Contact Email</label>
-              <input type="email" id="adminShopEmail" class="form-input">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Phone Number</label>
-              <input type="text" id="adminShopPhone" class="form-input">
-            </div>
+
             <div style="margin-top: 24px; border-top: 1px solid var(--color-card-border); padding-top: 20px;">
-              <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px;">Social Links</h3>
+              <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px;">Global Contact & Social Links (All Languages)</h3>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label class="form-label">Logo Image URL</label>
+                  <input type="url" id="adminShopLogo" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Contact Email</label>
+                  <input type="email" id="adminShopEmail" class="form-input">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Phone Number</label>
+                  <input type="text" id="adminShopPhone" class="form-input">
+                </div>
                 <div class="form-group">
                   <label class="form-label">Instagram</label>
                   <input type="url" id="adminSocialInstagram" class="form-input">
@@ -147,66 +152,74 @@ function injectAdminDOM() {
                   <input type="url" id="adminSocialWhatsapp" class="form-input">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">GitHub / Portfolio</label>
-                  <input type="url" id="adminSocialGithub" class="form-input">
+                  <label class="form-label">Twitter</label>
+                  <input type="url" id="adminSocialTwitter" class="form-input">
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- TAB 2: Theme & Colors -->
+          <!-- TAB 2: Theme & Colors (Dual Dark/Light Palettes) -->
           <div id="tab-theme-style" class="admin-tab-pane">
-            <h2 class="pane-title">Theme & Visual Styling</h2>
-            <p class="pane-subtitle">Customize every color palette token and typography with real-time live preview.</p>
+            <h2 class="pane-title">Theme & Color Palettes</h2>
+            <p class="pane-subtitle">Edit both Light and Dark mode color palettes independently with live preview.</p>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 16px;">
+              <label class="form-label" style="margin: 0;">Active Editing Palette:</label>
+              <div class="lang-switcher">
+                <button id="btnEditDarkTheme" class="lang-btn active">🌙 Dark Mode</button>
+                <button id="btnEditLightTheme" class="lang-btn">☀️ Light Mode</button>
+              </div>
+            </div>
 
             <div class="color-picker-grid">
               <div class="color-picker-card">
                 <input type="color" id="themePrimary" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Primary Color</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Buttons, highlights</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Primary Color</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Buttons & Highlights</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeSecondary" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Secondary Color</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Headers & navigation</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Secondary Color</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Navigation & Headers</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeBg" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Background</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Main page backdrop</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Background</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Page Backdrop</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeCardBg" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Card Background</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Item card containers</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Card Background</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Card Containers</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeText" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Text Color</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Primary text color</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Text Color</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Body Text</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeAccent" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Accent Color</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Price tags & badges</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Accent Color</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Price Tags & Badges</div>
                 </div>
               </div>
               <div class="color-picker-card">
                 <input type="color" id="themeBorder" class="color-input-swatch">
                 <div>
-                  <div style="font-weight: 700; font-size: 0.9rem;">Border Color</div>
-                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Card & section outlines</div>
+                  <div style="font-weight: 700; font-size: 0.85rem;">Border Color</div>
+                  <div style="font-size: 0.75rem; color: var(--color-text-muted);">Card Outlines</div>
                 </div>
               </div>
             </div>
@@ -215,9 +228,8 @@ function injectAdminDOM() {
               <div class="form-group">
                 <label class="form-label">Font Family</label>
                 <select id="themeFontFamily" class="form-select">
-                  <option value="Inter, system-ui, -apple-system, sans-serif">Inter (Modern Clean)</option>
+                  <option value="Inter, system-ui, -apple-system, sans-serif">Inter / Tajawal (Clean)</option>
                   <option value="'Outfit', sans-serif">Outfit (Bold Display)</option>
-                  <option value="'Roboto Mono', monospace">Roboto Mono (Developer/Tech)</option>
                   <option value="system-ui, -apple-system, sans-serif">System Native Stack</option>
                 </select>
               </div>
@@ -259,14 +271,13 @@ function injectAdminDOM() {
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
               <div>
                 <h2 class="pane-title" style="margin: 0;">Items Catalog Manager</h2>
-                <p class="pane-subtitle" style="margin: 0;">Add, edit, delete, and manage store courses/items.</p>
+                <p class="pane-subtitle" style="margin: 0;">Add, edit, delete, and manage translated courses/items.</p>
               </div>
               <button id="btnAddNewItem" class="btn btn-primary">
                 + Add New Item
               </button>
             </div>
 
-            <!-- Items Admin List Container -->
             <div id="adminItemsList" class="admin-items-list"></div>
           </div>
 
@@ -338,42 +349,45 @@ function injectAdminDOM() {
       </div>
     </div>
 
-    <!-- Add/Edit Item Modal -->
+    <!-- Add/Edit Item Modal (Multilingual EN/FR/AR) -->
     <div id="itemModal" class="modal-overlay">
-      <div class="modal-container" style="max-width: 640px;">
+      <div class="modal-container" style="max-width: 680px;">
         <div class="modal-header">
           <h3 id="itemModalTitle" class="modal-title">Edit Item</h3>
           <button id="closeItemModal" class="modal-close">&times;</button>
         </div>
         <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
+          <div class="sub-tab-bar">
+            <button class="sub-tab-btn active" data-item-lang="en">English (EN)</button>
+            <button class="sub-tab-btn" data-item-lang="fr">Français (FR)</button>
+            <button class="sub-tab-btn" data-item-lang="ar">العربية (AR)</button>
+          </div>
+
           <form id="itemForm">
             <div class="form-group">
-              <label class="form-label">Title</label>
+              <label class="form-label">Title (<span id="modalLangLabel">EN</span>)</label>
               <input type="text" id="itemFormTitle" class="form-input" required>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
               <div class="form-group">
-                <label class="form-label">Category</label>
+                <label class="form-label">Category (<span id="modalLangLabelCat">EN</span>)</label>
                 <input type="text" id="itemFormCategory" class="form-input" required>
               </div>
               <div class="form-group">
-                <label class="form-label">Price</label>
+                <label class="form-label">Price (<span id="modalLangLabelPrice">EN</span>)</label>
                 <input type="text" id="itemFormPrice" class="form-input" required placeholder="e.g. $89.99 or 3000 DZD">
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Short Description (Card teaser)</label>
+              <label class="form-label">Short Description</label>
               <input type="text" id="itemFormShortDesc" class="form-input" required>
             </div>
             <div class="form-group">
-              <label class="form-label">Full Description (Detail page)</label>
+              <label class="form-label">Full Description</label>
               <textarea id="itemFormFullDesc" class="form-textarea" required></textarea>
             </div>
             <div class="form-group">
-              <label class="form-label">Image Option</label>
-              <div class="alert-banner alert-warning" style="padding: 10px 14px; margin-bottom: 10px; font-size: 0.8rem;">
-                💡 <strong>Recommended:</strong> Provide an Image URL. Uploading Base64 files directly compresses images to max 800px to avoid bloating JSON size.
-              </div>
+              <label class="form-label">Image Option (Global across languages)</label>
               <label class="form-label" style="font-size: 0.8rem;">Option A: Image URL</label>
               <input type="url" id="itemFormImageUrl" class="form-input" placeholder="https://images.unsplash.com/...">
               
@@ -416,16 +430,12 @@ function injectAdminDOM() {
       </div>
     </div>
 
-    <!-- Toast Notification Holder -->
     <div id="toastContainer" class="toast-container"></div>
   `;
 
   document.body.insertAdjacentHTML('beforeend', adminHTML);
 }
 
-/**
- * Binds DOM event handlers
- */
 function bindEvents() {
   const triggerBtn = document.getElementById('adminTriggerBtn');
   const loginModal = document.getElementById('loginModal');
@@ -435,7 +445,6 @@ function bindEvents() {
   const closeAdminPanel = document.getElementById('closeAdminPanel');
   const quickPublishBtn = document.getElementById('quickPublishBtn');
 
-  // Trigger Login or Admin Panel
   triggerBtn.addEventListener('click', () => {
     if (isSessionActive()) {
       openAdminPanel();
@@ -447,7 +456,6 @@ function bindEvents() {
   closeLoginModal.addEventListener('click', () => loginModal.classList.remove('active'));
   closeAdminPanel.addEventListener('click', () => adminPanel.classList.remove('active'));
 
-  // Handle Login Submission
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('loginUsername').value;
@@ -473,7 +481,7 @@ function bindEvents() {
     }
   });
 
-  // Admin Sidebar Tab Switching
+  // Sidebar Tabs
   const tabBtns = document.querySelectorAll('.admin-tab-btn');
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -485,25 +493,68 @@ function bindEvents() {
     });
   });
 
-  // Real-time Inputs binding for Shop Info
-  const shopInputs = ['adminShopName', 'adminShopTagline', 'adminShopDesc', 'adminShopLogo', 'adminShopEmail', 'adminShopPhone', 'adminSocialInstagram', 'adminSocialFacebook', 'adminSocialWhatsapp', 'adminSocialGithub'];
-  shopInputs.forEach(id => {
-    document.getElementById(id).addEventListener('input', updateDraftShopInfo);
+  // Shop Info Sub-tabs (EN/FR/AR)
+  const shopSubTabBtns = document.querySelectorAll('[data-shop-lang]');
+  shopSubTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      saveShopInfoFormToDraft();
+      shopSubTabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeShopLang = btn.getAttribute('data-shop-lang');
+      loadShopInfoFormFromDraft();
+    });
   });
 
-  // Real-time Inputs binding for Theme Colors & Settings
+  // Item Form Sub-tabs (EN/FR/AR)
+  const itemSubTabBtns = document.querySelectorAll('[data-item-lang]');
+  itemSubTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      saveItemFormToTemporary();
+      itemSubTabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeItemLang = btn.getAttribute('data-item-lang');
+      loadItemFormFromTemporary();
+    });
+  });
+
+  // Real-time Inputs for Shop Info
+  const shopInputs = ['adminShopName', 'adminShopTagline', 'adminShopDesc', 'adminShopLogo', 'adminShopEmail', 'adminShopPhone', 'adminSocialInstagram', 'adminSocialFacebook', 'adminSocialWhatsapp', 'adminSocialTwitter'];
+  shopInputs.forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      saveShopInfoFormToDraft();
+      setConfig(draftConfig, true);
+    });
+  });
+
+  // Theme Editing Mode Buttons (Dark vs Light)
+  document.getElementById('btnEditDarkTheme').addEventListener('click', () => {
+    activeThemeEditingMode = 'dark';
+    document.getElementById('btnEditDarkTheme').classList.add('active');
+    document.getElementById('btnEditLightTheme').classList.remove('active');
+    setThemeMode('dark');
+    loadThemePaletteToForm();
+  });
+  document.getElementById('btnEditLightTheme').addEventListener('click', () => {
+    activeThemeEditingMode = 'light';
+    document.getElementById('btnEditLightTheme').classList.add('active');
+    document.getElementById('btnEditDarkTheme').classList.remove('active');
+    setThemeMode('light');
+    loadThemePaletteToForm();
+  });
+
+  // Theme Inputs
   const themeInputs = ['themePrimary', 'themeSecondary', 'themeBg', 'themeCardBg', 'themeText', 'themeAccent', 'themeBorder', 'themeFontFamily', 'themeBorderRadius'];
   themeInputs.forEach(id => {
     document.getElementById(id).addEventListener('input', updateDraftTheme);
   });
 
-  // Real-time Inputs binding for Grid Layout
+  // Grid Inputs
   const gridInputs = ['gridDesktop', 'gridTablet', 'gridMobile', 'gridGap'];
   gridInputs.forEach(id => {
     document.getElementById(id).addEventListener('input', updateDraftGrid);
   });
 
-  // CRUD Items Trigger
+  // Items CRUD
   document.getElementById('btnAddNewItem').addEventListener('click', () => openItemModal());
   document.getElementById('closeItemModal').addEventListener('click', () => document.getElementById('itemModal').classList.remove('active'));
   document.getElementById('itemForm').addEventListener('submit', handleSaveItem);
@@ -537,43 +588,21 @@ function openLoginModal() {
   document.getElementById('loginPassword').focus();
 }
 
-/**
- * Hydrates and renders Admin Panel state from in-memory config
- */
 function openAdminPanel() {
   draftConfig = JSON.parse(JSON.stringify(getConfig()));
   document.getElementById('publishPAT').value = getSavedPAT();
 
-  // Populate Shop Info Form
-  const s = draftConfig.shop || {};
-  document.getElementById('adminShopName').value = s.name || '';
-  document.getElementById('adminShopTagline').value = s.tagline || '';
-  document.getElementById('adminShopDesc').value = s.description || '';
-  document.getElementById('adminShopLogo').value = s.logoUrl || '';
-  document.getElementById('adminShopEmail').value = s.contactEmail || '';
-  document.getElementById('adminShopPhone').value = s.phone || '';
-  const soc = s.socialLinks || {};
-  document.getElementById('adminSocialInstagram').value = soc.instagram || '';
-  document.getElementById('adminSocialFacebook').value = soc.facebook || '';
-  document.getElementById('adminSocialWhatsapp').value = soc.whatsapp || '';
-  document.getElementById('adminSocialGithub').value = soc.github || '';
+  activeShopLang = getLanguage();
+  loadShopInfoFormFromDraft();
 
-  // Populate Theme Colors & Typography
-  const t = draftConfig.theme || {};
-  const c = t.colors || {};
-  document.getElementById('themePrimary').value = c.primary || '#4f46e5';
-  document.getElementById('themeSecondary').value = c.secondary || '#0f172a';
-  document.getElementById('themeBg').value = c.background || '#0b0f19';
-  document.getElementById('themeCardBg').value = c.cardBackground || '#131b2e';
-  document.getElementById('themeText').value = c.text || '#f8fafc';
-  document.getElementById('themeAccent').value = c.accent || '#06b6d4';
-  document.getElementById('themeBorder').value = c.border || '#1e293b';
-  document.getElementById('themeFontFamily').value = t.fontFamily || 'Inter, system-ui, -apple-system, sans-serif';
-  const radVal = parseInt(t.borderRadius) || 16;
-  document.getElementById('themeBorderRadius').value = radVal;
-  document.getElementById('borderRadiusVal').textContent = radVal;
+  activeThemeEditingMode = getThemeMode();
+  if (activeThemeEditingMode === 'light') {
+    document.getElementById('btnEditLightTheme').click();
+  } else {
+    document.getElementById('btnEditDarkTheme').click();
+  }
 
-  // Populate Grid Specs
+  // Grid
   const g = draftConfig.grid || {};
   document.getElementById('gridDesktop').value = g.columnsDesktop || 3;
   document.getElementById('gridTablet').value = g.columnsTablet || 2;
@@ -582,58 +611,102 @@ function openAdminPanel() {
   document.getElementById('gridGap').value = gapVal;
   document.getElementById('gridGapVal').textContent = gapVal;
 
-  // Populate Security Specs
+  // Security
   const a = draftConfig.admin || {};
   document.getElementById('adminUsername').value = a.username || 'admin';
   document.getElementById('repoOwner').value = a.repoOwner || 'hafedazerty100';
   document.getElementById('repoName').value = a.repoName || 'Portfolio';
   document.getElementById('repoBranch').value = a.repoBranch || 'main';
 
-  // Render Items List
   renderAdminItemsList();
 
   document.getElementById('staleCommitBanner').style.display = 'none';
   document.getElementById('adminPanel').classList.add('active');
 }
 
-/**
- * Live DOM update for Shop Info edits
- */
-function updateDraftShopInfo() {
-  if (!draftConfig) return;
-  draftConfig.shop = draftConfig.shop || {};
-  draftConfig.shop.name = document.getElementById('adminShopName').value;
-  draftConfig.shop.tagline = document.getElementById('adminShopTagline').value;
-  draftConfig.shop.description = document.getElementById('adminShopDesc').value;
-  draftConfig.shop.logoUrl = document.getElementById('adminShopLogo').value;
-  draftConfig.shop.contactEmail = document.getElementById('adminShopEmail').value;
-  draftConfig.shop.phone = document.getElementById('adminShopPhone').value;
-  draftConfig.shop.socialLinks = {
+function loadShopInfoFormFromDraft() {
+  if (!draftConfig || !draftConfig.i18n) return;
+  const content = draftConfig.i18n[activeShopLang] || draftConfig.i18n['en'];
+  const s = content.shop || {};
+
+  document.getElementById('adminShopName').value = s.name || '';
+  document.getElementById('adminShopTagline').value = s.tagline || '';
+  document.getElementById('adminShopDesc').value = s.description || '';
+  document.getElementById('adminShopLogo').value = s.logoUrl || '';
+  document.getElementById('adminShopEmail').value = s.contactEmail || '';
+  document.getElementById('adminShopPhone').value = s.phone || '';
+
+  const soc = s.socialLinks || {};
+  document.getElementById('adminSocialInstagram').value = soc.instagram || '';
+  document.getElementById('adminSocialFacebook').value = soc.facebook || '';
+  document.getElementById('adminSocialWhatsapp').value = soc.whatsapp || '';
+  document.getElementById('adminSocialTwitter').value = soc.twitter || '';
+}
+
+function saveShopInfoFormToDraft() {
+  if (!draftConfig || !draftConfig.i18n) return;
+
+  ['en', 'fr', 'ar'].forEach(lang => {
+    draftConfig.i18n[lang] = draftConfig.i18n[lang] || {};
+    draftConfig.i18n[lang].shop = draftConfig.i18n[lang].shop || {};
+  });
+
+  const curShop = draftConfig.i18n[activeShopLang].shop;
+  curShop.name = document.getElementById('adminShopName').value;
+  curShop.tagline = document.getElementById('adminShopTagline').value;
+  curShop.description = document.getElementById('adminShopDesc').value;
+
+  const logoUrl = document.getElementById('adminShopLogo').value;
+  const contactEmail = document.getElementById('adminShopEmail').value;
+  const phone = document.getElementById('adminShopPhone').value;
+  const socialLinks = {
     instagram: document.getElementById('adminSocialInstagram').value,
     facebook: document.getElementById('adminSocialFacebook').value,
     whatsapp: document.getElementById('adminSocialWhatsapp').value,
-    github: document.getElementById('adminSocialGithub').value
+    twitter: document.getElementById('adminSocialTwitter').value
   };
 
-  setConfig(draftConfig, true);
+  ['en', 'fr', 'ar'].forEach(lang => {
+    draftConfig.i18n[lang].shop.logoUrl = logoUrl;
+    draftConfig.i18n[lang].shop.contactEmail = contactEmail;
+    draftConfig.i18n[lang].shop.phone = phone;
+    draftConfig.i18n[lang].shop.socialLinks = socialLinks;
+  });
 }
 
-/**
- * Live DOM update for Theme edits (updates CSS custom properties live!)
- */
+function loadThemePaletteToForm() {
+  if (!draftConfig || !draftConfig.theme) return;
+  const mode = activeThemeEditingMode;
+  const palette = draftConfig.theme[mode] || draftConfig.theme.dark;
+
+  document.getElementById('themePrimary').value = palette.primary || '#6366f1';
+  document.getElementById('themeSecondary').value = palette.secondary || '#0f172a';
+  document.getElementById('themeBg').value = palette.background || '#0b0f19';
+  document.getElementById('themeCardBg').value = palette.cardBackground || '#131b2e';
+  document.getElementById('themeText').value = palette.text || '#f8fafc';
+  document.getElementById('themeAccent').value = palette.accent || '#06b6d4';
+  document.getElementById('themeBorder').value = palette.border || '#1e293b';
+
+  document.getElementById('themeFontFamily').value = draftConfig.theme.fontFamily || 'Inter, system-ui, -apple-system, sans-serif';
+  const radVal = parseInt(draftConfig.theme.borderRadius) || 16;
+  document.getElementById('themeBorderRadius').value = radVal;
+  document.getElementById('borderRadiusVal').textContent = radVal;
+}
+
 function updateDraftTheme() {
-  if (!draftConfig) return;
-  draftConfig.theme = draftConfig.theme || {};
-  draftConfig.theme.colors = {
+  if (!draftConfig || !draftConfig.theme) return;
+  const mode = activeThemeEditingMode;
+  draftConfig.theme[mode] = {
     primary: document.getElementById('themePrimary').value,
     secondary: document.getElementById('themeSecondary').value,
     background: document.getElementById('themeBg').value,
     cardBackground: document.getElementById('themeCardBg').value,
     text: document.getElementById('themeText').value,
-    textMuted: '#94a3b8',
+    textMuted: (mode === 'dark') ? '#94a3b8' : '#64748b',
     accent: document.getElementById('themeAccent').value,
     border: document.getElementById('themeBorder').value
   };
+
   draftConfig.theme.fontFamily = document.getElementById('themeFontFamily').value;
   const rad = document.getElementById('themeBorderRadius').value;
   draftConfig.theme.borderRadius = `${rad}px`;
@@ -642,9 +715,6 @@ function updateDraftTheme() {
   setConfig(draftConfig, true);
 }
 
-/**
- * Live DOM update for Grid Layout edits
- */
 function updateDraftGrid() {
   if (!draftConfig) return;
   const gap = document.getElementById('gridGap').value;
@@ -660,9 +730,6 @@ function updateDraftGrid() {
   setConfig(draftConfig, true);
 }
 
-/**
- * Live update for Admin security & repo fields
- */
 function updateDraftSecurity() {
   if (!draftConfig) return;
   draftConfig.admin = draftConfig.admin || {};
@@ -674,14 +741,11 @@ function updateDraftSecurity() {
   setConfig(draftConfig, false);
 }
 
-/**
- * Renders Items list in Admin panel
- */
 function renderAdminItemsList() {
   const container = document.getElementById('adminItemsList');
   container.innerHTML = '';
 
-  const items = draftConfig.items || [];
+  const items = (draftConfig.i18n && draftConfig.i18n.en) ? draftConfig.i18n.en.items || [] : [];
   if (items.length === 0) {
     container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--color-text-muted);">No items in catalog. Click "+ Add New Item" to create one.</div>`;
     return;
@@ -713,66 +777,110 @@ function renderAdminItemsList() {
   });
 }
 
-/**
- * Opens Item Add/Edit Modal
- */
+// Temporary buffer when editing multi-language item modal
+let temporaryItemState = { en: {}, fr: {}, ar: {} };
+
 function openItemModal(itemId = null) {
   editingItemId = itemId;
+  activeItemLang = 'en';
+  document.querySelectorAll('[data-item-lang]').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-item-lang="en"]').classList.add('active');
+
   const modal = document.getElementById('itemModal');
   const titleEl = document.getElementById('itemModalTitle');
-  const container = document.getElementById('extraFieldsContainer');
-  container.innerHTML = '';
   document.getElementById('imagePreviewBox').style.display = 'none';
   document.getElementById('itemFormFileInput').value = '';
 
   if (itemId) {
     titleEl.textContent = 'Edit Item';
-    const item = (draftConfig.items || []).find(i => i.id === itemId);
-    if (item) {
-      document.getElementById('itemFormTitle').value = item.title || '';
-      document.getElementById('itemFormCategory').value = item.category || '';
-      document.getElementById('itemFormPrice').value = item.price || '';
-      document.getElementById('itemFormShortDesc').value = item.shortDescription || '';
-      document.getElementById('itemFormFullDesc').value = item.fullDescription || '';
-      document.getElementById('itemFormImageUrl').value = item.imageUrl || '';
-
-      if (item.imageBase64) {
-        document.getElementById('imagePreviewImg').src = item.imageBase64;
-        document.getElementById('imagePreviewBox').style.display = 'block';
-      }
-
-      const extras = item.extraFields || {};
-      Object.keys(extras).forEach(k => addExtraFieldRow(k, extras[k]));
-    }
+    ['en', 'fr', 'ar'].forEach(lang => {
+      const list = (draftConfig.i18n && draftConfig.i18n[lang]) ? draftConfig.i18n[lang].items || [] : [];
+      const item = list.find(i => i.id === itemId);
+      temporaryItemState[lang] = item ? JSON.parse(JSON.stringify(item)) : { id: itemId };
+    });
   } else {
     titleEl.textContent = 'Add New Item';
-    document.getElementById('itemForm').reset();
-    addExtraFieldRow('duration', '6 Weeks');
-    addExtraFieldRow('instructor', 'Instructor Name');
+    const newId = `item-${Date.now()}`;
+    ['en', 'fr', 'ar'].forEach(lang => {
+      temporaryItemState[lang] = {
+        id: newId,
+        title: '',
+        category: '',
+        price: '',
+        shortDescription: '',
+        fullDescription: '',
+        imageUrl: '',
+        imageBase64: '',
+        extraFields: { duration: '', instructor: '' }
+      };
+    });
   }
 
+  loadItemFormFromTemporary();
   modal.classList.add('active');
 }
 
-/**
- * Dynamically appends key-value row for item metadata
- */
+function loadItemFormFromTemporary() {
+  const item = temporaryItemState[activeItemLang] || {};
+  document.getElementById('itemFormTitle').value = item.title || '';
+  document.getElementById('itemFormCategory').value = item.category || '';
+  document.getElementById('itemFormPrice').value = item.price || '';
+  document.getElementById('itemFormShortDesc').value = item.shortDescription || '';
+  document.getElementById('itemFormFullDesc').value = item.fullDescription || '';
+  document.getElementById('itemFormImageUrl').value = item.imageUrl || temporaryItemState['en'].imageUrl || '';
+
+  if (item.imageBase64 || temporaryItemState['en'].imageBase64) {
+    document.getElementById('imagePreviewImg').src = item.imageBase64 || temporaryItemState['en'].imageBase64;
+    document.getElementById('imagePreviewBox').style.display = 'block';
+  }
+
+  const container = document.getElementById('extraFieldsContainer');
+  container.innerHTML = '';
+  const extras = item.extraFields || {};
+  Object.keys(extras).forEach(k => addExtraFieldRow(k, extras[k]));
+}
+
+function saveItemFormToTemporary() {
+  const item = temporaryItemState[activeItemLang] || {};
+  item.title = document.getElementById('itemFormTitle').value;
+  item.category = document.getElementById('itemFormCategory').value;
+  item.price = document.getElementById('itemFormPrice').value;
+  item.shortDescription = document.getElementById('itemFormShortDesc').value;
+  item.fullDescription = document.getElementById('itemFormFullDesc').value;
+
+  const imageUrl = document.getElementById('itemFormImageUrl').value;
+  const imageBase64 = document.getElementById('imagePreviewBox').style.display !== 'none' ? document.getElementById('imagePreviewImg').src : '';
+
+  // Apply image across all language versions
+  ['en', 'fr', 'ar'].forEach(lang => {
+    temporaryItemState[lang].imageUrl = imageUrl;
+    temporaryItemState[lang].imageBase64 = imageBase64;
+  });
+
+  const extraFields = {};
+  const keys = document.querySelectorAll('.extra-key');
+  const vals = document.querySelectorAll('.extra-val');
+  keys.forEach((kEl, idx) => {
+    const k = kEl.value.trim();
+    const v = vals[idx] ? vals[idx].value.trim() : '';
+    if (k) extraFields[k] = v;
+  });
+  item.extraFields = extraFields;
+}
+
 function addExtraFieldRow(key = '', val = '') {
   const container = document.getElementById('extraFieldsContainer');
   const row = document.createElement('div');
   row.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 30px; gap: 8px; margin-bottom: 8px;';
   row.innerHTML = `
-    <input type="text" placeholder="Key (e.g. Duration)" class="form-input extra-key" value="${escapeHTML(key)}">
-    <input type="text" placeholder="Value (e.g. 6 Weeks)" class="form-input extra-val" value="${escapeHTML(val)}">
+    <input type="text" placeholder="Key" class="form-input extra-key" value="${escapeHTML(key)}">
+    <input type="text" placeholder="Value" class="form-input extra-val" value="${escapeHTML(val)}">
     <button type="button" class="btn btn-secondary btn-remove-extra" style="padding: 0; color: var(--color-danger);">&times;</button>
   `;
   row.querySelector('.btn-remove-extra').addEventListener('click', () => row.remove());
   container.appendChild(row);
 }
 
-/**
- * Image upload Canvas client-side scaling & compression (max 800px, JPEG 0.85)
- */
 function handleImageFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -813,56 +921,34 @@ function handleImageFileUpload(e) {
   reader.readAsDataURL(file);
 }
 
-/**
- * Saves item details into draftConfig
- */
 function handleSaveItem(e) {
   e.preventDefault();
-  draftConfig.items = draftConfig.items || [];
+  saveItemFormToTemporary();
 
-  const title = document.getElementById('itemFormTitle').value;
-  const category = document.getElementById('itemFormCategory').value;
-  const price = document.getElementById('itemFormPrice').value;
-  const shortDescription = document.getElementById('itemFormShortDesc').value;
-  const fullDescription = document.getElementById('itemFormFullDesc').value;
-  const imageUrl = document.getElementById('itemFormImageUrl').value;
-  const imageBase64 = document.getElementById('imagePreviewBox').style.display !== 'none' ? document.getElementById('imagePreviewImg').src : '';
+  ['en', 'fr', 'ar'].forEach(lang => {
+    draftConfig.i18n[lang] = draftConfig.i18n[lang] || {};
+    draftConfig.i18n[lang].items = draftConfig.i18n[lang].items || [];
+    const list = draftConfig.i18n[lang].items;
+    const itemData = temporaryItemState[lang];
 
-  // Extract extra metadata fields
-  const extraFields = {};
-  const keys = document.querySelectorAll('.extra-key');
-  const vals = document.querySelectorAll('.extra-val');
-  keys.forEach((kEl, idx) => {
-    const k = kEl.value.trim();
-    const v = vals[idx] ? vals[idx].value.trim() : '';
-    if (k) extraFields[k] = v;
-  });
-
-  if (editingItemId) {
-    const idx = draftConfig.items.findIndex(i => i.id === editingItemId);
-    if (idx !== -1) {
-      draftConfig.items[idx] = {
-        ...draftConfig.items[idx],
-        title, category, price, shortDescription, fullDescription, imageUrl, imageBase64, extraFields
-      };
+    if (editingItemId) {
+      const idx = list.findIndex(i => i.id === editingItemId);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...itemData };
+      } else {
+        list.push(itemData);
+      }
+    } else {
+      list.push(itemData);
     }
-  } else {
-    const newItem = {
-      id: `item-${Date.now()}`,
-      title, category, price, shortDescription, fullDescription, imageUrl, imageBase64, extraFields
-    };
-    draftConfig.items.push(newItem);
-  }
+  });
 
   setConfig(draftConfig, true);
   renderAdminItemsList();
   document.getElementById('itemModal').classList.remove('active');
-  showToast('Item saved successfully!', 'success');
+  showToast('Item saved across all languages!', 'success');
 }
 
-/**
- * Prompts Delete Confirmation Dialog for Item
- */
 function promptDeleteItem(itemId, itemTitle) {
   itemToDeleteId = itemId;
   const textEl = document.getElementById('deleteConfirmText');
@@ -870,21 +956,21 @@ function promptDeleteItem(itemId, itemTitle) {
   document.getElementById('deleteConfirmModal').classList.add('active');
 }
 
-/**
- * Executes deletion after user confirmation
- */
 function executeItemDelete() {
   if (!itemToDeleteId || !draftConfig) return;
-  draftConfig.items = (draftConfig.items || []).filter(i => i.id !== itemToDeleteId);
+
+  ['en', 'fr', 'ar'].forEach(lang => {
+    if (draftConfig.i18n && draftConfig.i18n[lang]) {
+      draftConfig.i18n[lang].items = (draftConfig.i18n[lang].items || []).filter(i => i.id !== itemToDeleteId);
+    }
+  });
+
   setConfig(draftConfig, true);
   renderAdminItemsList();
   document.getElementById('deleteConfirmModal').classList.remove('active');
   showToast('Item deleted from catalog.', 'warning');
 }
 
-/**
- * Handles Publish to GitHub REST Contents API
- */
 async function handlePublish() {
   const statusEl = document.getElementById('publishStatus');
   const patInput = document.getElementById('publishPAT').value.trim();
@@ -896,7 +982,6 @@ async function handlePublish() {
 
   setSavedPAT(patInput);
 
-  // Validate password change if provided
   const newPass = document.getElementById('adminNewPassword').value.trim();
   if (newPass) {
     const strength = validatePasswordStrength(newPass);
@@ -944,9 +1029,6 @@ async function handlePublish() {
   }
 }
 
-/**
- * Discard local edits and reload original config
- */
 async function handleDiscard() {
   if (confirm('Discard all unpublished edits and reload original configuration?')) {
     const config = await loadConfig(true);
@@ -956,9 +1038,6 @@ async function handleDiscard() {
   }
 }
 
-/**
- * Reloads latest config from GitHub when 409 Stale Conflict is encountered
- */
 async function handleReloadStaleConfig() {
   try {
     const config = await loadConfig(true);
@@ -970,9 +1049,6 @@ async function handleReloadStaleConfig() {
   }
 }
 
-/**
- * Toast Notification Helper
- */
 function showToast(message, type = 'success') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');

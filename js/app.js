@@ -1,8 +1,8 @@
 /**
- * App — Main application bootstrap & public page renderer
+ * App — Main application bootstrap, multilingual i18n hydration, and theme toggle handler
  */
 
-import { loadConfig, onConfigChange, getConfig } from './config-loader.js';
+import { loadConfig, onConfigChange, getContent, getUI, getLanguage, setLanguage, getThemeMode, toggleThemeMode } from './config-loader.js';
 import { initAdmin } from './admin.js';
 
 let activeCategoryFilter = 'ALL';
@@ -10,8 +10,12 @@ let activeCategoryFilter = 'ALL';
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     const config = await loadConfig();
+    renderControls();
     renderPage(config);
-    onConfigChange((newConfig) => renderPage(newConfig));
+    onConfigChange((newConfig) => {
+      renderControls();
+      renderPage(newConfig);
+    });
     initAdmin();
   } catch (err) {
     console.error('App initialization error:', err);
@@ -20,23 +24,70 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /**
- * Route router & public renderer
+ * Renders Header Theme Toggle (Sun/Moon) & Language Switcher (EN / FR / عربي)
+ */
+function renderControls() {
+  const controlsContainer = document.getElementById('headerControls');
+  if (!controlsContainer) return;
+
+  const currentLang = getLanguage();
+  const currentMode = getThemeMode();
+
+  const themeIcon = currentMode === 'dark' ? '☀️' : '🌙';
+
+  controlsContainer.innerHTML = `
+    <button id="btnThemeToggle" class="btn-theme-toggle" title="Toggle Light/Dark Theme">
+      ${themeIcon}
+    </button>
+    <div class="lang-switcher">
+      <button class="lang-btn ${currentLang === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+      <button class="lang-btn ${currentLang === 'fr' ? 'active' : ''}" data-lang="fr">FR</button>
+      <button class="lang-btn ${currentLang === 'ar' ? 'active' : ''}" data-lang="ar">عربي</button>
+    </div>
+  `;
+
+  // Bind Theme Toggle Listener
+  document.getElementById('btnThemeToggle').addEventListener('click', () => {
+    toggleThemeMode();
+  });
+
+  // Bind Language Switcher Listeners
+  controlsContainer.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const targetLang = e.target.getAttribute('data-lang');
+      setLanguage(targetLang);
+    });
+  });
+}
+
+/**
+ * Route router & public renderer using current language content
  */
 function renderPage(config) {
   if (!config) return;
 
-  renderShopHeader(config.shop);
+  const content = getContent();
+  const ui = getUI();
+  if (!content) return;
+
+  renderShopHeader(content.shop);
 
   const isItemPage = window.location.pathname.endsWith('item.html') || window.location.search.includes('id=');
   if (isItemPage) {
-    renderItemDetailPage(config);
+    renderItemDetailPage(content, ui);
   } else {
-    renderHomePage(config);
+    renderHomePage(content, ui);
+  }
+
+  // Hydrate Footer
+  const footerText = document.getElementById('footerText');
+  if (footerText && ui.footerText) {
+    footerText.textContent = ui.footerText;
   }
 }
 
 /**
- * Renders Shop Header branding, contact info, and social links
+ * Renders Shop Header branding, contact info, and social links (excl. GitHub)
  */
 function renderShopHeader(shop) {
   if (!shop) return;
@@ -44,13 +95,11 @@ function renderShopHeader(shop) {
   const logoEl = document.getElementById('shopLogo');
   const nameEl = document.getElementById('shopName');
   const taglineEl = document.getElementById('shopTagline');
-  const descEl = document.getElementById('shopDesc');
   const socialEl = document.getElementById('shopSocials');
 
   if (logoEl && shop.logoUrl) logoEl.src = shop.logoUrl;
-  if (nameEl) nameEl.textContent = shop.name || 'Apex Store';
+  if (nameEl) nameEl.textContent = shop.name || 'Apex Academy';
   if (taglineEl) taglineEl.textContent = shop.tagline || '';
-  if (descEl) descEl.textContent = shop.description || '';
 
   if (socialEl && shop.socialLinks) {
     const links = shop.socialLinks;
@@ -58,34 +107,42 @@ function renderShopHeader(shop) {
     if (links.instagram) html += `<a href="${escapeHTML(links.instagram)}" target="_blank" class="social-link">Instagram</a>`;
     if (links.facebook) html += `<a href="${escapeHTML(links.facebook)}" target="_blank" class="social-link">Facebook</a>`;
     if (links.whatsapp) html += `<a href="${escapeHTML(links.whatsapp)}" target="_blank" class="social-link">WhatsApp</a>`;
-    if (links.github) html += `<a href="${escapeHTML(links.github)}" target="_blank" class="social-link">GitHub</a>`;
+    if (links.twitter) html += `<a href="${escapeHTML(links.twitter)}" target="_blank" class="social-link">Twitter</a>`;
     socialEl.innerHTML = html;
   }
 }
 
 /**
- * Renders Homepage grid and category filter buttons
+ * Renders Homepage hero, category filters, and catalog items grid
  */
-function renderHomePage(config) {
+function renderHomePage(content, ui) {
   const gridContainer = document.getElementById('itemsGrid');
   const filterContainer = document.getElementById('categoryFilters');
+  const heroTitleEl = document.getElementById('heroTitle');
+  const heroDescEl = document.getElementById('heroDesc');
+
+  if (heroTitleEl && ui.heroTitle) heroTitleEl.textContent = ui.heroTitle;
+  if (heroDescEl && content.shop && content.shop.description) heroDescEl.textContent = content.shop.description;
+
   if (!gridContainer) return;
 
-  const items = config.items || [];
+  const items = content.items || [];
+  const allLabel = ui.allCategories || 'ALL';
 
-  // Build Categories
+  // Build Category Filters
   if (filterContainer) {
-    const categories = ['ALL', ...new Set(items.map(i => i.category).filter(Boolean))];
+    const categories = [allLabel, ...new Set(items.map(i => i.category).filter(Boolean))];
     filterContainer.innerHTML = categories.map(cat => `
-      <button class="filter-btn ${cat === activeCategoryFilter ? 'active' : ''}" data-cat="${escapeHTML(cat)}">
+      <button class="filter-btn ${cat === activeCategoryFilter || (activeCategoryFilter === 'ALL' && cat === allLabel) ? 'active' : ''}" data-cat="${escapeHTML(cat)}">
         ${escapeHTML(cat)}
       </button>
     `).join('');
 
     filterContainer.querySelectorAll('.filter-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        activeCategoryFilter = e.target.getAttribute('data-cat');
-        renderHomePage(getConfig());
+        const selectedCat = e.target.getAttribute('data-cat');
+        activeCategoryFilter = (selectedCat === allLabel) ? 'ALL' : selectedCat;
+        renderHomePage(getContent(), getUI());
       });
     });
   }
@@ -98,7 +155,7 @@ function renderHomePage(config) {
   if (filteredItems.length === 0) {
     gridContainer.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--color-text-muted);">
-        No items available in this category.
+        No items available.
       </div>
     `;
     return;
@@ -117,7 +174,7 @@ function renderHomePage(config) {
           <p class="item-card-desc">${escapeHTML(item.shortDescription)}</p>
           <div class="item-card-meta">
             <span class="item-card-price">${escapeHTML(item.price)}</span>
-            <span class="btn-card-action">View Details →</span>
+            <span class="btn-card-action">${escapeHTML(ui.viewDetails || 'View Details →')}</span>
           </div>
         </div>
       </a>
@@ -128,30 +185,28 @@ function renderHomePage(config) {
 /**
  * Renders Item Detail View on item.html
  */
-function renderItemDetailPage(config) {
+function renderItemDetailPage(content, ui) {
   const container = document.getElementById('itemDetailContainer');
   if (!container) return;
 
   const urlParams = new URLSearchParams(window.location.search);
   const itemId = urlParams.get('id');
 
-  const items = config.items || [];
+  const items = content.items || [];
   const item = items.find(i => i.id === itemId);
 
   if (!item) {
     container.innerHTML = `
       <div class="not-found-state">
-        <h2 class="not-found-title">Item Unavailable</h2>
-        <p class="not-found-text">The requested course or item could not be found or has been removed from our catalog.</p>
-        <a href="index.html" class="btn btn-primary">← Back to All Items</a>
+        <h2 class="not-found-title">${escapeHTML(ui.itemUnavailable || 'Item Unavailable')}</h2>
+        <p class="not-found-text">${escapeHTML(ui.itemUnavailableText || 'The requested item could not be found.')}</p>
+        <a href="index.html" class="btn btn-primary">${escapeHTML(ui.backToItems || '← Back to Catalog')}</a>
       </div>
     `;
     return;
   }
 
-  // Update Page Title
-  document.title = `${item.title} — ${config.shop ? config.shop.name : 'Store'}`;
-
+  document.title = `${item.title} — ${content.shop ? content.shop.name : 'Store'}`;
   const imgSrc = item.imageUrl || item.imageBase64 || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800';
 
   // Render Extra Fields Grid
@@ -170,7 +225,7 @@ function renderItemDetailPage(config) {
   }
 
   container.innerHTML = `
-    <a href="index.html" class="btn-back">← Back to Catalog</a>
+    <a href="index.html" class="btn-back">${escapeHTML(ui.backToItems || '← Back to Catalog')}</a>
     <div class="detail-layout">
       <div class="detail-media">
         <img src="${imgSrc}" alt="${escapeHTML(item.title)}">
@@ -182,8 +237,8 @@ function renderItemDetailPage(config) {
         <p class="detail-description">${escapeHTML(item.fullDescription)}</p>
         ${extraHTML}
         <div style="margin-top: auto; display: flex; gap: 16px;">
-          <a href="mailto:${config.shop ? config.shop.contactEmail : ''}?subject=Inquiry: ${encodeURIComponent(item.title)}" class="btn btn-primary btn-block">
-            Enroll / Purchase Inquiry
+          <a href="mailto:${content.shop ? content.shop.contactEmail : ''}?subject=Inquiry: ${encodeURIComponent(item.title)}" class="btn btn-primary btn-block">
+            ${escapeHTML(ui.enrollInquiry || 'Enroll / Purchase Inquiry')}
           </a>
         </div>
       </div>
