@@ -1,10 +1,10 @@
 /**
- * Admin — Admin system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
+ * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, and Live Grid Preview
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.5';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.5';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.5';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.6';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.6';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.6';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -269,7 +269,7 @@ function injectAdminDOM() {
             </div>
           </div>
 
-          <!-- TAB 4: Items Catalog CRUD -->
+          <!-- TAB 4: Items Catalog CRUD & Live Grid Preview -->
           <div id="tab-items-crud" class="admin-tab-pane">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
               <div>
@@ -281,7 +281,17 @@ function injectAdminDOM() {
               </button>
             </div>
 
+            <!-- Admin Items Row List -->
             <div id="adminItemsList" class="admin-items-list"></div>
+
+            <!-- Live Grid Preview Container Inside Admin Panel -->
+            <div style="margin-top: 36px; border-top: 1px solid var(--color-card-border); padding-top: 24px;">
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+                <span>👁️ Live Grid Preview (As Visitors See It)</span>
+                <span style="font-size: 0.8rem; font-weight: 400; color: var(--color-text-muted);">Real-time DOM Preview</span>
+              </h3>
+              <div id="adminLivePreviewGrid" class="items-grid" style="margin-bottom: 0;"></div>
+            </div>
           </div>
 
           <!-- TAB 5: Security & Repo -->
@@ -396,7 +406,7 @@ function injectAdminDOM() {
               <input type="file" id="itemFormFileInput" accept="image/*" class="form-input">
               <p class="form-hint">Images are automatically scaled to max 800px and compressed before saving.</p>
               <div id="imagePreviewBox" style="margin-top: 12px; display: none;">
-                <img id="imagePreviewImg" src="" style="max-height: 140px; border-radius: 8px; border: 1px solid var(--color-card-border); object-fit: cover;">
+                <img id="imagePreviewImg" style="max-height: 140px; border-radius: 8px; border: 1px solid var(--color-card-border); object-fit: cover;">
               </div>
             </div>
 
@@ -747,20 +757,26 @@ function updateDraftSecurity() {
   setConfig(draftConfig, false);
 }
 
+/**
+ * Renders both Admin Item Row List AND Live Grid Preview inside Admin Panel
+ */
 function renderAdminItemsList() {
   const container = document.getElementById('adminItemsList');
+  const previewContainer = document.getElementById('adminLivePreviewGrid');
   if (!container) return;
   container.innerHTML = '';
 
   draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
-  const items = (draftConfig.i18n && draftConfig.i18n.en) ? draftConfig.i18n.en.items || [] : [];
-  console.log('[Admin Items List] Rendering items count:', items.length);
+  const lang = getLanguage();
+  const items = (draftConfig.i18n && draftConfig.i18n[lang]) ? draftConfig.i18n[lang].items || [] : (draftConfig.i18n?.en?.items || []);
 
   if (items.length === 0) {
     container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--color-text-muted);">No items in catalog. Click "+ Add New Item" to create one.</div>`;
+    if (previewContainer) previewContainer.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 20px; color: var(--color-text-muted);">No items in grid preview.</div>`;
     return;
   }
 
+  // 1. Render Admin Item Row Controls
   items.forEach(item => {
     const row = document.createElement('div');
     row.className = 'admin-item-row';
@@ -785,12 +801,34 @@ function renderAdminItemsList() {
 
     container.appendChild(row);
   });
+
+  // 2. Render Live Grid Preview Cards Inside Admin Panel
+  if (previewContainer) {
+    previewContainer.innerHTML = items.map(item => {
+      const imgSrc = item.imageBase64 || item.imageUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800';
+      return `
+        <div class="item-card" style="pointer-events: none;">
+          <div class="item-card-image-wrap">
+            <img src="${imgSrc}" class="item-card-image" alt="${escapeHTML(item.title)}">
+            ${item.category ? `<span class="item-badge">${escapeHTML(item.category)}</span>` : ''}
+          </div>
+          <div class="item-card-body">
+            <h3 class="item-card-title">${escapeHTML(item.title)}</h3>
+            <p class="item-card-desc">${escapeHTML(item.shortDescription)}</p>
+            <div class="item-card-meta">
+              <span class="item-card-price">${escapeHTML(item.price)}</span>
+              <span class="btn-card-action">Preview</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 function openItemModal(itemId = null) {
   editingItemId = itemId;
   activeItemLang = 'en';
-  console.log('[Admin Modal] Opening Item Modal. itemId:', itemId);
 
   draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
 
@@ -823,6 +861,7 @@ function openItemModal(itemId = null) {
         shortDescription: '',
         fullDescription: '',
         imageBase64: '',
+        imageUrl: '',
         extraFields: { duration: '', instructor: '' }
       };
     });
@@ -840,13 +879,16 @@ function loadItemFormFromTemporary() {
   document.getElementById('itemFormShortDesc').value = item.shortDescription || '';
   document.getElementById('itemFormFullDesc').value = item.fullDescription || '';
 
+  const imgEl = document.getElementById('imagePreviewImg');
+  const boxEl = document.getElementById('imagePreviewBox');
+
   const sharedImg = currentModalImageBase64 || item.imageBase64 || temporaryItemState['en'].imageBase64 || '';
   if (sharedImg) {
-    document.getElementById('imagePreviewImg').src = sharedImg;
-    document.getElementById('imagePreviewBox').style.display = 'block';
+    imgEl.setAttribute('src', sharedImg);
+    boxEl.style.display = 'block';
   } else {
-    document.getElementById('imagePreviewImg').src = '';
-    document.getElementById('imagePreviewBox').style.display = 'none';
+    imgEl.removeAttribute('src');
+    boxEl.style.display = 'none';
   }
 
   const container = document.getElementById('extraFieldsContainer');
@@ -866,13 +908,11 @@ function saveItemFormToTemporary() {
   item.shortDescription = document.getElementById('itemFormShortDesc').value.trim();
   item.fullDescription = document.getElementById('itemFormFullDesc').value.trim();
 
-  const imageBase64 = currentModalImageBase64 || document.getElementById('imagePreviewImg').src || '';
-
-  // Apply uploaded image to all language versions
+  // Track ONLY via currentModalImageBase64 (NO .src reading!)
   ['en', 'fr', 'ar'].forEach(lang => {
     if (!temporaryItemState[lang]) temporaryItemState[lang] = {};
-    temporaryItemState[lang].imageBase64 = imageBase64;
-    temporaryItemState[lang].imageUrl = imageBase64;
+    temporaryItemState[lang].imageBase64 = currentModalImageBase64;
+    temporaryItemState[lang].imageUrl = currentModalImageBase64;
   });
 
   const extraFields = {};
@@ -884,8 +924,6 @@ function saveItemFormToTemporary() {
     if (k) extraFields[k] = v;
   });
   item.extraFields = extraFields;
-
-  console.log(`[Admin Save Temp] Saved language '${activeItemLang}' temp state:`, item);
 }
 
 function addExtraFieldRow(key = '', val = '') {
@@ -904,8 +942,6 @@ function addExtraFieldRow(key = '', val = '') {
 function handleImageFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-
-  console.log('[Admin Image Upload] File selected:', file.name, file.size, file.type);
 
   const reader = new FileReader();
   reader.onload = function(evt) {
@@ -936,8 +972,10 @@ function handleImageFileUpload(e) {
       const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
       currentModalImageBase64 = compressedBase64;
 
-      document.getElementById('imagePreviewImg').src = compressedBase64;
-      document.getElementById('imagePreviewBox').style.display = 'block';
+      const imgEl = document.getElementById('imagePreviewImg');
+      const boxEl = document.getElementById('imagePreviewBox');
+      imgEl.setAttribute('src', compressedBase64);
+      boxEl.style.display = 'block';
 
       // Store immediately to temporary state
       ['en', 'fr', 'ar'].forEach(lang => {
@@ -946,7 +984,6 @@ function handleImageFileUpload(e) {
         temporaryItemState[lang].imageUrl = compressedBase64;
       });
 
-      console.log('[Admin Image Upload] Canvas scaling complete. Base64 length:', compressedBase64.length);
       showToast(`Image uploaded & compressed to ${Math.round(width)}x${Math.round(height)}px`, 'success');
     };
     img.src = evt.target.result;
@@ -956,8 +993,6 @@ function handleImageFileUpload(e) {
 
 function handleSaveItem(e) {
   e.preventDefault();
-  console.log('[Admin Item Save] Form submission handler triggered. editingItemId:', editingItemId);
-
   saveItemFormToTemporary();
 
   draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
@@ -998,9 +1033,7 @@ function handleSaveItem(e) {
     }
   });
 
-  console.log('[Admin Item Save] Updated config items list count:', draftConfig.i18n.en.items.length);
-
-  // Apply to in-memory config and update live DOM
+  // Apply to in-memory config and update live DOM and Admin Live Grid Preview
   setConfig(draftConfig, true);
   renderAdminItemsList();
   document.getElementById('itemModal').classList.remove('active');
