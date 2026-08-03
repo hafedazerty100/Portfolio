@@ -2,9 +2,9 @@
  * Admin — Admin system interface with Light/Dark Theme editing and Multilingual (EN/FR/AR) content editor
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.4';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.4';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.4';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.5';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.5';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.5';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -16,6 +16,7 @@ let activeItemLang = 'en';
 let activeThemeEditingMode = 'dark';
 
 let temporaryItemState = { en: {}, fr: {}, ar: {} };
+let currentModalImageBase64 = '';
 
 export function initAdmin() {
   injectAdminDOM();
@@ -748,9 +749,13 @@ function updateDraftSecurity() {
 
 function renderAdminItemsList() {
   const container = document.getElementById('adminItemsList');
+  if (!container) return;
   container.innerHTML = '';
 
+  draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
   const items = (draftConfig.i18n && draftConfig.i18n.en) ? draftConfig.i18n.en.items || [] : [];
+  console.log('[Admin Items List] Rendering items count:', items.length);
+
   if (items.length === 0) {
     container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--color-text-muted);">No items in catalog. Click "+ Add New Item" to create one.</div>`;
     return;
@@ -785,8 +790,13 @@ function renderAdminItemsList() {
 function openItemModal(itemId = null) {
   editingItemId = itemId;
   activeItemLang = 'en';
+  console.log('[Admin Modal] Opening Item Modal. itemId:', itemId);
+
+  draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
+
   document.querySelectorAll('[data-item-lang]').forEach(b => b.classList.remove('active'));
-  document.querySelector('[data-item-lang="en"]').classList.add('active');
+  const enTabBtn = document.querySelector('[data-item-lang="en"]');
+  if (enTabBtn) enTabBtn.classList.add('active');
 
   const modal = document.getElementById('itemModal');
   const titleEl = document.getElementById('itemModalTitle');
@@ -799,9 +809,11 @@ function openItemModal(itemId = null) {
       const item = list.find(i => i.id === itemId);
       temporaryItemState[lang] = item ? JSON.parse(JSON.stringify(item)) : { id: itemId };
     });
+    currentModalImageBase64 = temporaryItemState['en'].imageBase64 || temporaryItemState['en'].imageUrl || '';
   } else {
     titleEl.textContent = 'Add New Item';
     const newId = `item-${Date.now()}`;
+    currentModalImageBase64 = '';
     ['en', 'fr', 'ar'].forEach(lang => {
       temporaryItemState[lang] = {
         id: newId,
@@ -828,7 +840,7 @@ function loadItemFormFromTemporary() {
   document.getElementById('itemFormShortDesc').value = item.shortDescription || '';
   document.getElementById('itemFormFullDesc').value = item.fullDescription || '';
 
-  const sharedImg = item.imageBase64 || temporaryItemState['en'].imageBase64 || temporaryItemState['en'].imageUrl || '';
+  const sharedImg = currentModalImageBase64 || item.imageBase64 || temporaryItemState['en'].imageBase64 || '';
   if (sharedImg) {
     document.getElementById('imagePreviewImg').src = sharedImg;
     document.getElementById('imagePreviewBox').style.display = 'block';
@@ -848,13 +860,13 @@ function saveItemFormToTemporary() {
     temporaryItemState[activeItemLang] = {};
   }
   const item = temporaryItemState[activeItemLang];
-  item.title = document.getElementById('itemFormTitle').value;
-  item.category = document.getElementById('itemFormCategory').value;
-  item.price = document.getElementById('itemFormPrice').value;
-  item.shortDescription = document.getElementById('itemFormShortDesc').value;
-  item.fullDescription = document.getElementById('itemFormFullDesc').value;
+  item.title = document.getElementById('itemFormTitle').value.trim();
+  item.category = document.getElementById('itemFormCategory').value.trim();
+  item.price = document.getElementById('itemFormPrice').value.trim();
+  item.shortDescription = document.getElementById('itemFormShortDesc').value.trim();
+  item.fullDescription = document.getElementById('itemFormFullDesc').value.trim();
 
-  const imageBase64 = document.getElementById('imagePreviewBox').style.display !== 'none' ? document.getElementById('imagePreviewImg').src : '';
+  const imageBase64 = currentModalImageBase64 || document.getElementById('imagePreviewImg').src || '';
 
   // Apply uploaded image to all language versions
   ['en', 'fr', 'ar'].forEach(lang => {
@@ -872,6 +884,8 @@ function saveItemFormToTemporary() {
     if (k) extraFields[k] = v;
   });
   item.extraFields = extraFields;
+
+  console.log(`[Admin Save Temp] Saved language '${activeItemLang}' temp state:`, item);
 }
 
 function addExtraFieldRow(key = '', val = '') {
@@ -890,6 +904,8 @@ function addExtraFieldRow(key = '', val = '') {
 function handleImageFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
+
+  console.log('[Admin Image Upload] File selected:', file.name, file.size, file.type);
 
   const reader = new FileReader();
   reader.onload = function(evt) {
@@ -918,6 +934,8 @@ function handleImageFileUpload(e) {
       ctx.drawImage(img, 0, 0, width, height);
 
       const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+      currentModalImageBase64 = compressedBase64;
+
       document.getElementById('imagePreviewImg').src = compressedBase64;
       document.getElementById('imagePreviewBox').style.display = 'block';
 
@@ -928,6 +946,7 @@ function handleImageFileUpload(e) {
         temporaryItemState[lang].imageUrl = compressedBase64;
       });
 
+      console.log('[Admin Image Upload] Canvas scaling complete. Base64 length:', compressedBase64.length);
       showToast(`Image uploaded & compressed to ${Math.round(width)}x${Math.round(height)}px`, 'success');
     };
     img.src = evt.target.result;
@@ -937,9 +956,15 @@ function handleImageFileUpload(e) {
 
 function handleSaveItem(e) {
   e.preventDefault();
+  console.log('[Admin Item Save] Form submission handler triggered. editingItemId:', editingItemId);
+
   saveItemFormToTemporary();
 
+  draftConfig = draftConfig || JSON.parse(JSON.stringify(getConfig()));
+  draftConfig.i18n = draftConfig.i18n || { en: {}, fr: {}, ar: {} };
+
   const primary = temporaryItemState['en'] || {};
+  const itemIdToUse = editingItemId || primary.id || `item-${Date.now()}`;
 
   ['en', 'fr', 'ar'].forEach(lang => {
     draftConfig.i18n[lang] = draftConfig.i18n[lang] || {};
@@ -948,14 +973,14 @@ function handleSaveItem(e) {
     const currentLangItem = temporaryItemState[lang] || {};
 
     const finalItem = {
-      id: primary.id || `item-${Date.now()}`,
+      id: itemIdToUse,
       title: currentLangItem.title || primary.title || 'Untitled Item',
       category: currentLangItem.category || primary.category || 'General',
       price: currentLangItem.price || primary.price || '$0.00',
       shortDescription: currentLangItem.shortDescription || primary.shortDescription || '',
       fullDescription: currentLangItem.fullDescription || primary.fullDescription || '',
-      imageBase64: primary.imageBase64 || currentLangItem.imageBase64 || '',
-      imageUrl: primary.imageBase64 || currentLangItem.imageBase64 || '',
+      imageBase64: currentModalImageBase64 || primary.imageBase64 || currentLangItem.imageBase64 || '',
+      imageUrl: currentModalImageBase64 || primary.imageBase64 || currentLangItem.imageBase64 || '',
       extraFields: (currentLangItem.extraFields && Object.keys(currentLangItem.extraFields).length > 0)
         ? currentLangItem.extraFields
         : (primary.extraFields || {})
@@ -973,7 +998,9 @@ function handleSaveItem(e) {
     }
   });
 
-  // Set config live and update preview
+  console.log('[Admin Item Save] Updated config items list count:', draftConfig.i18n.en.items.length);
+
+  // Apply to in-memory config and update live DOM
   setConfig(draftConfig, true);
   renderAdminItemsList();
   document.getElementById('itemModal').classList.remove('active');
