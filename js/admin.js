@@ -2,9 +2,9 @@
  * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, Live Grid Preview, and Upload-Only Shop Logo
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.3';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.3';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.3';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.1.4';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.1.4';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.1.4';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -657,7 +657,7 @@ function openAdminPanel() {
   // Pre-fetch remote SHA to prevent stale config updates and speed up first publish
   const savedToken = getSavedPAT();
   if (savedToken) {
-    import('./github-api.js?v=1.1.3')
+    import('./github-api.js?v=1.1.4')
       .then(m => m.getFileMetadata(owner, repo, 'data/config.json', branch, savedToken))
       .then(meta => {
         initialConfigSha = meta.sha;

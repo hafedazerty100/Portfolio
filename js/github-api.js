@@ -14,10 +14,9 @@ export class StaleCommitConflictError extends Error {
  */
 export async function getFileMetadata(owner, repo, path = 'data/config.json', branch = 'main', patToken) {
   const cleanToken = patToken ? patToken.trim() : '';
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}&t=${Date.now()}`;
   const headers = {
-    'Accept': 'application/vnd.github+json',
-    'Cache-Control': 'no-cache'
+    'Accept': 'application/vnd.github+json'
   };
 
   if (cleanToken) {
