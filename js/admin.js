@@ -1,10 +1,10 @@
 /**
- * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, and Live Grid Preview
+ * Admin — Admin system interface with Light/Dark Theme editing, Multilingual (EN/FR/AR) content editor, Live Grid Preview, and Upload-Only Shop Logo
  */
 
-import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.7';
-import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.7';
-import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.7';
+import { getConfig, setConfig, loadConfig, getThemeMode, setThemeMode, getLanguage, setLanguage } from './config-loader.js?v=1.0.8';
+import { loginAdmin, isSessionActive, getSavedPAT, setSavedPAT, validatePasswordStrength, hashPassword } from './auth.js?v=1.0.8';
+import { publishConfigToGitHub, StaleCommitConflictError } from './github-api.js?v=1.0.8';
 
 let draftConfig = null;
 let initialConfigSha = null;
@@ -17,6 +17,7 @@ let activeThemeEditingMode = 'dark';
 
 let temporaryItemState = { en: {}, fr: {}, ar: {} };
 let currentModalImageBase64 = '';
+let currentShopLogoBase64 = '';
 
 export function initAdmin() {
   injectAdminDOM();
@@ -103,7 +104,7 @@ function injectAdminDOM() {
             </div>
           </div>
 
-          <!-- TAB 1: Shop Info (Multilingual EN/FR/AR) -->
+          <!-- TAB 1: Shop Info (Multilingual EN/FR/AR & Upload-Only Logo) -->
           <div id="tab-shop-info" class="admin-tab-pane active">
             <h2 class="pane-title">Shop Information</h2>
             <p class="pane-subtitle">Edit branding, descriptions, logo, and social media links across all 3 languages.</p>
@@ -128,12 +129,19 @@ function injectAdminDOM() {
             </div>
 
             <div style="margin-top: 24px; border-top: 1px solid var(--color-card-border); padding-top: 20px;">
-              <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px;">Global Contact & Social Links (All Languages)</h3>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div class="form-group">
-                  <label class="form-label">Logo Image URL</label>
-                  <input type="url" id="adminShopLogo" class="form-input">
+              <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 16px;">Global Branding & Social Links (All Languages)</h3>
+              
+              <!-- Upload-Only Shop Logo Field -->
+              <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label">Upload Shop Logo Photo</label>
+                <input type="file" id="adminShopLogoFileInput" accept="image/*" class="form-input">
+                <p class="form-hint">Logo image is automatically scaled to max 300px and compressed before saving.</p>
+                <div id="shopLogoPreviewBox" style="margin-top: 12px; display: none;">
+                  <img id="shopLogoPreviewImg" style="max-height: 80px; border-radius: 8px; border: 1px solid var(--color-card-border); object-fit: contain;">
                 </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="form-group">
                   <label class="form-label">Contact Email</label>
                   <input type="email" id="adminShopEmail" class="form-input">
@@ -529,8 +537,11 @@ function bindEvents() {
     });
   });
 
+  // Shop Logo File Upload Handler
+  document.getElementById('adminShopLogoFileInput').addEventListener('change', handleShopLogoUpload);
+
   // Real-time Inputs for Shop Info
-  const shopInputs = ['adminShopName', 'adminShopTagline', 'adminShopDesc', 'adminShopLogo', 'adminShopEmail', 'adminShopPhone', 'adminSocialInstagram', 'adminSocialFacebook', 'adminSocialWhatsapp', 'adminSocialTwitter'];
+  const shopInputs = ['adminShopName', 'adminShopTagline', 'adminShopDesc', 'adminShopEmail', 'adminShopPhone', 'adminSocialInstagram', 'adminSocialFacebook', 'adminSocialWhatsapp', 'adminSocialTwitter'];
   shopInputs.forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
       saveShopInfoFormToDraft();
@@ -648,7 +659,18 @@ function loadShopInfoFormFromDraft() {
   document.getElementById('adminShopName').value = s.name || '';
   document.getElementById('adminShopTagline').value = s.tagline || '';
   document.getElementById('adminShopDesc').value = s.description || '';
-  document.getElementById('adminShopLogo').value = s.logoUrl || '';
+
+  currentShopLogoBase64 = s.logoUrl || '';
+  const logoImgEl = document.getElementById('shopLogoPreviewImg');
+  const logoBoxEl = document.getElementById('shopLogoPreviewBox');
+  if (currentShopLogoBase64) {
+    logoImgEl.setAttribute('src', currentShopLogoBase64);
+    logoBoxEl.style.display = 'block';
+  } else {
+    logoImgEl.removeAttribute('src');
+    logoBoxEl.style.display = 'none';
+  }
+
   document.getElementById('adminShopEmail').value = s.contactEmail || '';
   document.getElementById('adminShopPhone').value = s.phone || '';
 
@@ -657,6 +679,53 @@ function loadShopInfoFormFromDraft() {
   document.getElementById('adminSocialFacebook').value = soc.facebook || '';
   document.getElementById('adminSocialWhatsapp').value = soc.whatsapp || '';
   document.getElementById('adminSocialTwitter').value = soc.twitter || '';
+}
+
+function handleShopLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const MAX_SIZE = 300;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_SIZE) {
+          height *= MAX_SIZE / width;
+          width = MAX_SIZE;
+        }
+      } else {
+        if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedBase64 = canvas.toDataURL('image/png'); // PNG preserves logo transparency
+      currentShopLogoBase64 = compressedBase64;
+
+      const imgEl = document.getElementById('shopLogoPreviewImg');
+      const boxEl = document.getElementById('shopLogoPreviewBox');
+      imgEl.setAttribute('src', compressedBase64);
+      boxEl.style.display = 'block';
+
+      saveShopInfoFormToDraft();
+      setConfig(draftConfig, true);
+      showToast('Shop Logo uploaded & updated!', 'success');
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function saveShopInfoFormToDraft() {
@@ -672,7 +741,6 @@ function saveShopInfoFormToDraft() {
   curShop.tagline = document.getElementById('adminShopTagline').value;
   curShop.description = document.getElementById('adminShopDesc').value;
 
-  const logoUrl = document.getElementById('adminShopLogo').value;
   const contactEmail = document.getElementById('adminShopEmail').value;
   const phone = document.getElementById('adminShopPhone').value;
   const socialLinks = {
@@ -683,7 +751,7 @@ function saveShopInfoFormToDraft() {
   };
 
   ['en', 'fr', 'ar'].forEach(lang => {
-    draftConfig.i18n[lang].shop.logoUrl = logoUrl;
+    draftConfig.i18n[lang].shop.logoUrl = currentShopLogoBase64;
     draftConfig.i18n[lang].shop.contactEmail = contactEmail;
     draftConfig.i18n[lang].shop.phone = phone;
     draftConfig.i18n[lang].shop.socialLinks = socialLinks;
