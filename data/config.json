@@ -1,0 +1,144 @@
+{
+  "shop": {
+    "name": "Apex Academy",
+    "tagline": "Master Future-Proof Digital Skills & Mastery Courses",
+    "description": "Premium online learning platform empowering creators, developers, and entrepreneurs worldwide with project-based, industry-grade masterclasses.",
+    "logoUrl": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=150&auto=format&fit=crop&q=80",
+    "contactEmail": "support@apexacademy.io",
+    "phone": "+1 (555) 234-5678",
+    "socialLinks": {
+      "instagram": "https://instagram.com/apexacademy",
+      "facebook": "https://facebook.com/apexacademy",
+      "whatsapp": "https://wa.me/15552345678",
+      "twitter": "https://twitter.com/apexacademy",
+      "github": "https://github.com/hafedazerty100/Portfolio"
+    }
+  },
+  "theme": {
+    "colors": {
+      "primary": "#4f46e5",
+      "secondary": "#0f172a",
+      "background": "#0b0f19",
+      "cardBackground": "#131b2e",
+      "text": "#f8fafc",
+      "textMuted": "#94a3b8",
+      "accent": "#06b6d4",
+      "border": "#1e293b"
+    },
+    "fontFamily": "Inter, system-ui, -apple-system, sans-serif",
+    "borderRadius": "16px",
+    "cardShadow": "0 10px 30px -10px rgba(0, 0, 0, 0.5)"
+  },
+  "grid": {
+    "columnsDesktop": 3,
+    "columnsTablet": 2,
+    "columnsMobile": 1,
+    "cardSize": "medium",
+    "gapPx": 24
+  },
+  "items": [
+    {
+      "id": "item-1",
+      "title": "Full-Stack Web Development Bootcamp",
+      "shortDescription": "Master modern HTML5, CSS3, JavaScript ES6+, React & Node.js through hands-on project creation.",
+      "fullDescription": "Become a complete full-stack web developer from scratch. In this intensive masterclass, you will learn responsive design, frontend architecture, REST APIs, database integration, security best practices, and modern deployment pipelines. Build 5 production-ready applications to showcase in your portfolio.",
+      "price": "$89.99",
+      "imageUrl": "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Development",
+      "extraFields": {
+        "duration": "12 Weeks",
+        "instructor": "Alex Thorne",
+        "level": "All Levels",
+        "certificate": "Yes"
+      }
+    },
+    {
+      "id": "item-2",
+      "title": "UI/UX & Product Design Masterclass",
+      "shortDescription": "Design gorgeous, high-converting digital products, wireframes, and interactive Figma prototypes.",
+      "fullDescription": "Elevate your design skill set to professional standards. Learn design systems, typography hierarchy, responsive grid frameworks, visual aesthetics, user research methodologies, and advanced Figma prototyping techniques to craft user experiences that delight.",
+      "price": "$69.99",
+      "imageUrl": "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Design",
+      "extraFields": {
+        "duration": "8 Weeks",
+        "instructor": "Elena Rostova",
+        "level": "Intermediate",
+        "certificate": "Yes"
+      }
+    },
+    {
+      "id": "item-3",
+      "title": "AI & Prompt Engineering for Creators",
+      "shortDescription": "Harness LLMs, Midjourney, and automated workflow agents to supercharge productivity 10x.",
+      "fullDescription": "Learn how to leverage artificial intelligence tools for coding, content creation, workflow automation, and graphic design. Master prompt engineering strategies, API integrations, agentic workflows, and customized LLM fine-tuning.",
+      "price": "$79.99",
+      "imageUrl": "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Artificial Intelligence",
+      "extraFields": {
+        "duration": "6 Weeks",
+        "instructor": "Marcus Vance",
+        "level": "Beginner to Advanced",
+        "certificate": "Yes"
+      }
+    },
+    {
+      "id": "item-4",
+      "title": "Cybersecurity & Ethical Hacking Essentials",
+      "shortDescription": "Understand network security, penetration testing, encryption, and defensive architecture.",
+      "fullDescription": "Dive deep into modern cybersecurity concepts. Learn ethical hacking techniques, vulnerability assessment, web security protocols, threat detection, cryptography fundamentals, and security audit methodologies.",
+      "price": "$94.99",
+      "imageUrl": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Security",
+      "extraFields": {
+        "duration": "10 Weeks",
+        "instructor": "Sarah Jenkins",
+        "level": "Intermediate",
+        "certificate": "Yes"
+      }
+    },
+    {
+      "id": "item-5",
+      "title": "Digital Marketing & Brand Strategy 2026",
+      "shortDescription": "Build high-impact brand campaigns, SEO strategies, content funnels, and viral social presence.",
+      "fullDescription": "Scale your brand or client businesses with proven growth marketing frameworks. Understand search engine optimization, performance advertising, social media storytelling, conversion rate optimization, and brand positioning.",
+      "price": "$59.99",
+      "imageUrl": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Business",
+      "extraFields": {
+        "duration": "6 Weeks",
+        "instructor": "David Chen",
+        "level": "Beginner",
+        "certificate": "Yes"
+      }
+    },
+    {
+      "id": "item-6",
+      "title": "Cloud Architecture & DevOps Infrastructure",
+      "shortDescription": "Deploy resilient, scalable cloud applications with Docker, Kubernetes, CI/CD, and AWS.",
+      "fullDescription": "Master cloud engineering and modern DevOps automation. Build continuous integration & deployment pipelines, containerize microservices, manage cloud infrastructure with Terraform, and implement automated monitoring.",
+      "price": "$99.99",
+      "imageUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80",
+      "imageBase64": "",
+      "category": "Development",
+      "extraFields": {
+        "duration": "10 Weeks",
+        "instructor": "Alex Thorne",
+        "level": "Advanced",
+        "certificate": "Yes"
+      }
+    }
+  ],
+  "admin": {
+    "username": "admin",
+    "passwordHash": "83fcd3f7129b081faeb043dc07262e63fea599da4be6869a7a1780f7084a15b4",
+    "repoOwner": "hafedazerty100",
+    "repoName": "Portfolio",
+    "repoBranch": "main"
+  }
+}
